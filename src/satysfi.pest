@@ -1,9 +1,0 @@
-WHITESPACE = _{ " " | "\t" | "\r" | "\n" }
-COMMENT = { "%" ~ comment_inner ~ ("\r" | "\n") }
-comment_inner = ${ (!("\r" | "\n") ~ ANY)* }
-
-// 必ずマッチしない要素。
-TODO = @{ !"DUMMY" ~ "DUMMY" }
-
-// literal
-unit = {"(" ~ ")"}

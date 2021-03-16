@@ -16,6 +16,12 @@ SATySFi の構文が記されるファイルは以下の2種類である。
 文書ファイルは以下のような構造からなっている。
 
 ```
+program_saty = { SOI ~ header_stage? ~ headers ~ (preamble ~ "in")? ~ expr ~ EOI }
 ```
 
+それに対して
+
+```
+program_satyh = { SOI ~ header_stage? ~ headers ~ preamble ~ EOI }
+```
 
