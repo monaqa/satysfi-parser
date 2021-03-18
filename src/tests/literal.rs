@@ -1,13 +1,13 @@
 use super::*;
 
 #[test]
-fn unit() {
+fn test_unit() {
     assert_eq!(
-        satysfi_parser::list("[(),(),()]"),
-        Ok(Pair {
-            rule: Rule::program,
-            range: Some((1, 3)),
-            inner: vec![]
+        satysfi_parser::const_unit("()"),
+        Ok(Cst {
+            rule: constant(unit),
+            range: (0, 2),
+            inner: vec![],
         })
     );
 }

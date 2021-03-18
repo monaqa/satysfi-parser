@@ -1,13 +1,15 @@
+use crate::types::rule::*;
+use crate::types::Cst;
+
 peg::parser! {
     pub grammar satysfi_parser() for str {
-        use crate::types::{Pair, Rule};
-        use crate::pair;
+        /// WHITESPACE
+        rule _() = [' ' | '\t' | '\n' | '\r']* {}
+        rule cr() = ['\n' | '\r'] {}
+        /// position (short name)
+        rule p() -> usize = pos:position!() {pos}
 
-        rule unit() -> Pair
-            = s:position!() "()" e:position!() { pair!(program, (s, e)) }
-
-        pub rule list() -> Pair =
-            s:position!() "[" l:unit() ** "," "]" e:position!()
-            { pair!(program, l) }
+        pub rule const_unit() -> Cst
+            = s:p() "(" _ ")" e:p() { Cst::new_leaf(constant(unit), (s, e)) }
     }
 }
