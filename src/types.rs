@@ -29,7 +29,7 @@ pub mod rule {
         unit,
         boolean,
         int,
-        // float,
+        float,
         // length,
         // string,
     }

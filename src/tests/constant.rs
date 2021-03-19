@@ -73,3 +73,42 @@ fn test_int() {
     assert!(satysfi_parser::const_int("0x12af").is_err());
     assert!(satysfi_parser::const_int("0xaf12").is_err());
 }
+
+#[test]
+fn test_float() {
+    assert_eq!(
+        satysfi_parser::const_float("0.3"),
+        Ok(Cst {
+            rule: constant(float),
+            range: (0, 3),
+            inner: vec![],
+        })
+    );
+    assert_eq!(
+        satysfi_parser::const_float("42.195"),
+        Ok(Cst {
+            rule: constant(float),
+            range: (0, 6),
+            inner: vec![],
+        })
+    );
+    assert_eq!(
+        satysfi_parser::const_float(".195"),
+        Ok(Cst {
+            rule: constant(float),
+            range: (0, 4),
+            inner: vec![],
+        })
+    );
+    assert_eq!(
+        satysfi_parser::const_float("42."),
+        Ok(Cst {
+            rule: constant(float),
+            range: (0, 3),
+            inner: vec![],
+        })
+    );
+    assert!(satysfi_parser::const_float(".").is_err());
+    assert!(satysfi_parser::const_float("1..3").is_err());
+    assert!(satysfi_parser::const_float("1..3").is_err());
+}
