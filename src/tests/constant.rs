@@ -38,6 +38,14 @@ fn test_boolean() {
 #[test]
 fn test_int() {
     assert_eq!(
+        satysfi_parser::const_int("0"),
+        Ok(Cst {
+            rule: constant(int),
+            range: (0, 1),
+            inner: vec![]
+        })
+    );
+    assert_eq!(
         satysfi_parser::const_int("1"),
         Ok(Cst {
             rule: constant(int),
@@ -110,6 +118,76 @@ fn test_float() {
     );
     assert!(satysfi_parser::const_float(".").is_err());
     assert!(satysfi_parser::const_float("1..3").is_err());
+}
+
+#[test]
+fn test_length() {
+    assert_eq!(
+        satysfi_parser::const_length("1pt"),
+        Ok(Cst {
+            rule: constant(length),
+            range: (0, 3),
+            inner: vec![]
+        })
+    );
+    assert_eq!(
+        satysfi_parser::const_length("1abc"),
+        Ok(Cst {
+            rule: constant(length),
+            range: (0, 4),
+            inner: vec![]
+        })
+    );
+    assert_eq!(
+        satysfi_parser::const_length("1a5F9-"),
+        Ok(Cst {
+            rule: constant(length),
+            range: (0, 6),
+            inner: vec![]
+        })
+    );
+    assert_eq!(
+        satysfi_parser::const_length("0.3pt"),
+        Ok(Cst {
+            rule: constant(length),
+            range: (0, 5),
+            inner: vec![],
+        })
+    );
+    assert_eq!(
+        satysfi_parser::const_length("42.195pt"),
+        Ok(Cst {
+            rule: constant(length),
+            range: (0, 8),
+            inner: vec![],
+        })
+    );
+    assert_eq!(
+        satysfi_parser::const_length(".195pt"),
+        Ok(Cst {
+            rule: constant(length),
+            range: (0, 6),
+            inner: vec![],
+        })
+    );
+    assert_eq!(
+        satysfi_parser::const_length("42.pt"),
+        Ok(Cst {
+            rule: constant(length),
+            range: (0, 5),
+            inner: vec![],
+        })
+    );
+    assert_eq!(
+        satysfi_parser::const_length("-1pt"),
+        Ok(Cst {
+            rule: constant(length),
+            range: (0, 4),
+            inner: vec![]
+        })
+    );
+    assert!(satysfi_parser::const_length(".pt").is_err());
+    assert!(satysfi_parser::const_length("1..3pt").is_err());
 }
 
 #[test]

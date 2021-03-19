@@ -30,7 +30,7 @@ pub mod rule {
         boolean,
         int,
         float,
-        // length,
+        length,
         string,
     }
 }
