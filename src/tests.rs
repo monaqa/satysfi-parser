@@ -5,7 +5,7 @@ use crate::types::Cst;
 
 use crate::types::rule::*;
 
-mod literal;
+mod constant;
 
 #[macro_export]
 macro_rules! assert_parsed {
