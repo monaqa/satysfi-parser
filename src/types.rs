@@ -16,11 +16,19 @@ pub struct Cst {
 pub mod rule {
     pub use self::Constant::*;
     pub use self::Rule::*;
+    pub use self::Term::*;
 
     #[derive(Debug, PartialEq, Eq)]
     #[allow(non_camel_case_types)]
     pub enum Rule {
+        term(Term),
         constant(Constant),
+    }
+
+    #[derive(Debug, PartialEq, Eq)]
+    #[allow(non_camel_case_types)]
+    pub enum Term {
+        term_constant,
     }
 
     #[derive(Debug, PartialEq, Eq)]
@@ -50,14 +58,14 @@ impl Cst {
         }
     }
 
-    // /// Rule と子を指定して、枝に相当する（子のある） node を生成する。
-    // /// 省略した range は子の range の最小・最大から計算される。
-    // pub fn new_node(rule: Rule, inner: Vec<Cst>) -> Self {
-    //     let range = inner.iter().fold((usize::MAX, 0), |acc, cst| {
-    //         let (acc_start, acc_end) = acc;
-    //         let (cst_start, cst_end) = cst.range;
-    //         (acc_start.min(cst_start), acc_end.max(cst_end))
-    //     });
-    //     Self { rule, range, inner }
-    // }
+    /// Rule と子を指定して、枝に相当する（子のある） node を生成する。
+    /// 省略した range は子の range の最小・最大から計算される。
+    pub fn new_node(rule: Rule, inner: Vec<Cst>) -> Self {
+        let range = inner.iter().fold((usize::MAX, 0), |acc, cst| {
+            let (acc_start, acc_end) = acc;
+            let (cst_start, cst_end) = cst.range;
+            (acc_start.min(cst_start), acc_end.max(cst_end))
+        });
+        Self { rule, range, inner }
+    }
 }

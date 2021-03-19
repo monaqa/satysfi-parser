@@ -12,6 +12,16 @@ peg::parser! {
         rule cr() = ['\n' | '\r'] {}
         rule ascii_digit() = ['0'..='9']
 
+        pub rule term_const() -> Cst =
+            inner:(
+                const_unit()
+                / const_bool()
+                / const_string()
+                / const_float()
+                / const_length()
+                / const_int())
+            { Cst::new_node(term(term_constant), vec![inner]) }
+
         pub rule const_unit() -> Cst =
             s:p() "(" _ ")" e:p() { Cst::new_leaf(constant(unit), (s, e)) }
 
@@ -43,7 +53,6 @@ peg::parser! {
                 } else {
                     Err("number of back quotation does not match.")
                 }
-
             }
         rule string_quotes() -> usize = n:"`"+ {n.len()}
         rule string_inner(qs: usize) = "`"*<{qs}>

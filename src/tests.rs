@@ -5,3 +5,4 @@ use crate::types::Cst;
 use crate::types::rule::*;
 
 mod constant;
+mod term;
