@@ -1,7 +1,8 @@
-use crate::{assert_not_parsed, assert_parsed, ast, Rule, SatysfiParser};
-use pest::Parser;
-
 mod util;
-use util::ParsedAst;
+use crate::grammar::satysfi_parser;
+use crate::types::Cst;
 
-mod literal;
+use crate::types::rule::*;
+
+mod constant;
+mod term;
