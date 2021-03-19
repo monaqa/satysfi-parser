@@ -110,5 +110,69 @@ fn test_float() {
     );
     assert!(satysfi_parser::const_float(".").is_err());
     assert!(satysfi_parser::const_float("1..3").is_err());
-    assert!(satysfi_parser::const_float("1..3").is_err());
+}
+
+#[test]
+fn test_string() {
+    assert_eq!(
+        satysfi_parser::const_string("`a`"),
+        Ok(Cst {
+            rule: constant(string),
+            range: (0, 3),
+            inner: vec![],
+        })
+    );
+    assert_eq!(
+        satysfi_parser::const_string("#`a`"),
+        Ok(Cst {
+            rule: constant(string),
+            range: (0, 4),
+            inner: vec![],
+        })
+    );
+    assert_eq!(
+        satysfi_parser::const_string("#`a`#"),
+        Ok(Cst {
+            rule: constant(string),
+            range: (0, 5),
+            inner: vec![],
+        })
+    );
+    assert_eq!(
+        satysfi_parser::const_string("`a`#"),
+        Ok(Cst {
+            rule: constant(string),
+            range: (0, 4),
+            inner: vec![],
+        })
+    );
+    assert_eq!(
+        satysfi_parser::const_string("`あいう`"),
+        Ok(Cst {
+            rule: constant(string),
+            range: (0, 11),
+            inner: vec![],
+        })
+    );
+    assert_eq!(
+        satysfi_parser::const_string("`` ` ``"),
+        Ok(Cst {
+            rule: constant(string),
+            range: (0, 7),
+            inner: vec![],
+        })
+    );
+    assert_eq!(
+        satysfi_parser::const_string("```\n hoge fuga `` `piyo` ```"),
+        Ok(Cst {
+            rule: constant(string),
+            range: (0, 28),
+            inner: vec![],
+        })
+    );
+    assert!(satysfi_parser::const_string("``").is_err());
+    assert!(satysfi_parser::const_string("# `a`").is_err());
+    assert!(satysfi_parser::const_string("``` ``` ```").is_err());
+    assert!(satysfi_parser::const_string("``` aaa ``").is_err());
+    assert!(satysfi_parser::const_string("`` aaa ```").is_err());
 }

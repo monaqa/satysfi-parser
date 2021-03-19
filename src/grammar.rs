@@ -27,5 +27,18 @@ peg::parser! {
             s:p()  (ascii_digit()+ "." ascii_digit()* / "." ascii_digit()+)  e:p()
             { Cst::new_leaf(constant(float), (s, e)) }
 
+        pub rule const_string() -> Cst =
+            s:p() "#"? qs:string_quotes() (!string_inner(qs) [_])+ qe:string_quotes() "#"? e:p()
+            {?
+                if qs == qe {
+                    Ok(Cst::new_leaf(constant(string), (s, e)))
+                } else {
+                    Err("number of back quotation does not match.")
+                }
+
+            }
+        rule string_quotes() -> usize = n:"`"+ {n.len()}
+        rule string_inner(qs: usize) = "`"*<{qs}>
+
     }
 }

@@ -31,7 +31,7 @@ pub mod rule {
         int,
         float,
         // length,
-        // string,
+        string,
     }
 }
 
