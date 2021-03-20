@@ -2,255 +2,70 @@ use super::*;
 
 #[test]
 fn test_unit() {
-    assert_eq!(
-        satysfi_parser::const_unit("()"),
-        Ok(Cst {
-            rule: constant(unit),
-            range: (0, 2),
-            inner: vec![],
-        })
-    );
+    assert_parsed!("()" const_unit: []);
+    assert_parsed!("( )" const_unit: []);
 }
 
 #[test]
 fn test_boolean() {
-    assert_eq!(
-        satysfi_parser::const_bool("true"),
-        Ok(Cst {
-            rule: constant(boolean),
-            range: (0, 4),
-            inner: vec![]
-        })
-    );
-    assert_eq!(
-        satysfi_parser::const_bool("false"),
-        Ok(Cst {
-            rule: constant(boolean),
-            range: (0, 5),
-            inner: vec![]
-        })
-    );
+    assert_parsed!("true" const_bool: []);
+    assert_parsed!("false" const_bool: []);
 
-    assert!(satysfi_parser::const_bool("True").is_err());
-    assert!(satysfi_parser::const_bool("TRUE").is_err());
+    assert_not_parsed!("True" const_bool: []);
+    assert_not_parsed!("TRUE" const_bool: []);
 }
 
 #[test]
 fn test_int() {
-    assert_eq!(
-        satysfi_parser::const_int("0"),
-        Ok(Cst {
-            rule: constant(int),
-            range: (0, 1),
-            inner: vec![]
-        })
-    );
-    assert_eq!(
-        satysfi_parser::const_int("1"),
-        Ok(Cst {
-            rule: constant(int),
-            range: (0, 1),
-            inner: vec![]
-        })
-    );
-    assert_eq!(
-        satysfi_parser::const_int("1230"),
-        Ok(Cst {
-            rule: constant(int),
-            range: (0, 4),
-            inner: vec![]
-        })
-    );
-    assert_eq!(
-        satysfi_parser::const_int("0x12AF"),
-        Ok(Cst {
-            rule: constant(int),
-            range: (0, 6),
-            inner: vec![]
-        })
-    );
-    assert_eq!(
-        satysfi_parser::const_int("0XAF12"),
-        Ok(Cst {
-            rule: constant(int),
-            range: (0, 6),
-            inner: vec![]
-        })
-    );
-    assert!(satysfi_parser::const_int("01").is_err());
-    assert!(satysfi_parser::const_int("0x12af").is_err());
-    assert!(satysfi_parser::const_int("0xaf12").is_err());
+    assert_parsed!("0" const_int: []);
+    assert_parsed!("1" const_int: []);
+    assert_parsed!("1230" const_int: []);
+    assert_parsed!("0x12AF" const_int: []);
+    assert_parsed!("0xAF12" const_int: []);
+
+    assert_not_parsed!("01" const_int: []);
+    assert_not_parsed!("0x12af" const_int: []);
+    assert_not_parsed!("0xaf12" const_int: []);
 }
 
 #[test]
 fn test_float() {
-    assert_eq!(
-        satysfi_parser::const_float("0.3"),
-        Ok(Cst {
-            rule: constant(float),
-            range: (0, 3),
-            inner: vec![],
-        })
-    );
-    assert_eq!(
-        satysfi_parser::const_float("42.195"),
-        Ok(Cst {
-            rule: constant(float),
-            range: (0, 6),
-            inner: vec![],
-        })
-    );
-    assert_eq!(
-        satysfi_parser::const_float(".195"),
-        Ok(Cst {
-            rule: constant(float),
-            range: (0, 4),
-            inner: vec![],
-        })
-    );
-    assert_eq!(
-        satysfi_parser::const_float("42."),
-        Ok(Cst {
-            rule: constant(float),
-            range: (0, 3),
-            inner: vec![],
-        })
-    );
-    assert!(satysfi_parser::const_float(".").is_err());
-    assert!(satysfi_parser::const_float("1..3").is_err());
+    assert_parsed!("0.3" const_float: []);
+    assert_parsed!("42.195" const_float: []);
+    assert_parsed!(".195" const_float: []);
+    assert_parsed!("42." const_float: []);
+
+    assert_not_parsed!("." const_float: []);
+    assert_not_parsed!("1..3" const_float: []);
 }
 
 #[test]
 fn test_length() {
-    assert_eq!(
-        satysfi_parser::const_length("1pt"),
-        Ok(Cst {
-            rule: constant(length),
-            range: (0, 3),
-            inner: vec![]
-        })
-    );
-    assert_eq!(
-        satysfi_parser::const_length("1abc"),
-        Ok(Cst {
-            rule: constant(length),
-            range: (0, 4),
-            inner: vec![]
-        })
-    );
-    assert_eq!(
-        satysfi_parser::const_length("1a5F9-"),
-        Ok(Cst {
-            rule: constant(length),
-            range: (0, 6),
-            inner: vec![]
-        })
-    );
-    assert_eq!(
-        satysfi_parser::const_length("0.3pt"),
-        Ok(Cst {
-            rule: constant(length),
-            range: (0, 5),
-            inner: vec![],
-        })
-    );
-    assert_eq!(
-        satysfi_parser::const_length("42.195pt"),
-        Ok(Cst {
-            rule: constant(length),
-            range: (0, 8),
-            inner: vec![],
-        })
-    );
-    assert_eq!(
-        satysfi_parser::const_length(".195pt"),
-        Ok(Cst {
-            rule: constant(length),
-            range: (0, 6),
-            inner: vec![],
-        })
-    );
-    assert_eq!(
-        satysfi_parser::const_length("42.pt"),
-        Ok(Cst {
-            rule: constant(length),
-            range: (0, 5),
-            inner: vec![],
-        })
-    );
-    assert_eq!(
-        satysfi_parser::const_length("-1pt"),
-        Ok(Cst {
-            rule: constant(length),
-            range: (0, 4),
-            inner: vec![]
-        })
-    );
-    assert!(satysfi_parser::const_length(".pt").is_err());
-    assert!(satysfi_parser::const_length("1..3pt").is_err());
+    assert_parsed!("1pt" const_length: []);
+    assert_parsed!("1abc" const_length: []);
+    assert_parsed!("1a5F9-" const_length: []);
+    assert_parsed!("0.3pt" const_length: []);
+    assert_parsed!("42.195pt" const_length: []);
+    assert_parsed!(".195pt" const_length: []);
+    assert_parsed!("42.pt" const_length: []);
+    assert_parsed!("-1pt" const_length: []);
+
+    assert_not_parsed!(".pt" const_length: []);
+    assert_not_parsed!("1..3pt" const_length: []);
 }
 
 #[test]
 fn test_string() {
-    assert_eq!(
-        satysfi_parser::const_string("`a`"),
-        Ok(Cst {
-            rule: constant(string),
-            range: (0, 3),
-            inner: vec![],
-        })
-    );
-    assert_eq!(
-        satysfi_parser::const_string("#`a`"),
-        Ok(Cst {
-            rule: constant(string),
-            range: (0, 4),
-            inner: vec![],
-        })
-    );
-    assert_eq!(
-        satysfi_parser::const_string("#`a`#"),
-        Ok(Cst {
-            rule: constant(string),
-            range: (0, 5),
-            inner: vec![],
-        })
-    );
-    assert_eq!(
-        satysfi_parser::const_string("`a`#"),
-        Ok(Cst {
-            rule: constant(string),
-            range: (0, 4),
-            inner: vec![],
-        })
-    );
-    assert_eq!(
-        satysfi_parser::const_string("`あいう`"),
-        Ok(Cst {
-            rule: constant(string),
-            range: (0, 11),
-            inner: vec![],
-        })
-    );
-    assert_eq!(
-        satysfi_parser::const_string("`` ` ``"),
-        Ok(Cst {
-            rule: constant(string),
-            range: (0, 7),
-            inner: vec![],
-        })
-    );
-    assert_eq!(
-        satysfi_parser::const_string("```\n hoge fuga `` `piyo` ```"),
-        Ok(Cst {
-            rule: constant(string),
-            range: (0, 28),
-            inner: vec![],
-        })
-    );
-    assert!(satysfi_parser::const_string("``").is_err());
-    assert!(satysfi_parser::const_string("# `a`").is_err());
-    assert!(satysfi_parser::const_string("``` ``` ```").is_err());
-    assert!(satysfi_parser::const_string("``` aaa ``").is_err());
-    assert!(satysfi_parser::const_string("`` aaa ```").is_err());
+    assert_parsed!("`a`" const_string: []);
+    assert_parsed!("`a`" const_string: []);
+    assert_parsed!("#`a`" const_string: []);
+    assert_parsed!("#`a`#" const_string: []);
+    assert_parsed!("`a`#" const_string: []);
+    assert_parsed!("`あいう`" const_string: []);
+    assert_parsed!("`` ` ``" const_string: []);
+    assert_parsed!("```\n hoge fuga `` `piyo` ```" const_string: []);
+
+    assert_not_parsed!("``" const_string: []);
+    assert_not_parsed!("``` ``` ```" const_string: []);
+    assert_not_parsed!("`` aaa ```" const_string: []);
 }
