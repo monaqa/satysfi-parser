@@ -13,7 +13,7 @@ fn test_unit() {
 
     let comp_cst = CompCstText {
         text: "()".to_owned(),
-        rule: constant(unit),
+        rule: Rule::const_unit,
         inner: None,
     };
 
