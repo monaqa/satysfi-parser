@@ -1,47 +1,45 @@
 use self::rule::Rule;
 
+/// CST にテキストの情報を付加したもの。
+// TODO: 自己参照構造体にする。
 #[derive(Debug, PartialEq, Eq)]
 pub struct CstText {
     pub text: String,
     pub cst: Cst,
 }
 
-#[derive(Debug, PartialEq, Eq)]
+impl CstText {
+    /// 与えられたパーサに基づき、与えられたテキストをパースする。
+    pub fn parse<F, E: std::error::Error>(text: &str, parser: F) -> std::result::Result<Self, E>
+    where
+        F: Fn(&str) -> std::result::Result<Cst, E>,
+        E: Send,
+    {
+        let cst = parser(text)?;
+        Ok(CstText {
+            text: text.to_owned(),
+            cst,
+        })
+    }
+
+    /// self.cst の子要素である Cst について、その要素に相当する text を取得する。
+    pub fn get_text(&self, cst: &Cst) -> &str {
+        let text = self.text.as_str();
+        let (s, e) = cst.range;
+        &text[s..e]
+    }
+}
+
+/// Concrete syntax tree.
+/// 1つの CST は構文規則、テキストの範囲、子要素からなり、全体として木構造をなす。
+#[derive(Debug, PartialEq, Eq, Clone)]
 pub struct Cst {
     pub rule: Rule,
     pub range: (usize, usize),
     pub inner: Vec<Cst>,
 }
 
-pub mod rule {
-    pub use self::Constant::*;
-    pub use self::Rule::*;
-    pub use self::Term::*;
-
-    #[derive(Debug, PartialEq, Eq)]
-    #[allow(non_camel_case_types)]
-    pub enum Rule {
-        term(Term),
-        constant(Constant),
-    }
-
-    #[derive(Debug, PartialEq, Eq)]
-    #[allow(non_camel_case_types)]
-    pub enum Term {
-        term_constant,
-    }
-
-    #[derive(Debug, PartialEq, Eq)]
-    #[allow(non_camel_case_types)]
-    pub enum Constant {
-        unit,
-        boolean,
-        int,
-        float,
-        length,
-        string,
-    }
-}
+pub mod rule;
 
 impl Cst {
     // /// 新たな CST を作成する。
@@ -67,5 +65,10 @@ impl Cst {
             (acc_start.min(cst_start), acc_end.max(cst_end))
         });
         Self { rule, range, inner }
+    }
+
+    pub fn as_str<'a>(&'a self, text: &'a str) -> &'a str {
+        let (s, e) = self.range;
+        &text[s..e]
     }
 }
