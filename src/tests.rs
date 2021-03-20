@@ -7,6 +7,7 @@ use crate::types::rule::Rule;
 use crate::{assert_not_parsed, assert_parsed, cst, cst_inner};
 
 mod constant;
+mod horizontal;
 mod term;
 
 use itertools::Itertools;

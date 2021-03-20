@@ -42,10 +42,10 @@ pub struct Cst {
 pub mod rule;
 
 impl Cst {
-    // /// 新たな CST を作成する。
-    // pub fn new(rule: Rule, range: (usize, usize), inner: Vec<Cst>) -> Self {
-    //     Self { rule, range, inner }
-    // }
+    /// 新たな CST を作成する。
+    pub fn new(rule: Rule, range: (usize, usize), inner: Vec<Cst>) -> Self {
+        Self { rule, range, inner }
+    }
 
     /// Rule と range を指定して、葉に相当する（子のない） node を生成する。
     pub fn new_leaf(rule: Rule, range: (usize, usize)) -> Self {

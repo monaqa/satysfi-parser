@@ -3,7 +3,6 @@ use crate::types::Cst;
 
 peg::parser! {
     pub grammar satysfi_parser() for str {
-        // constants
         /// WHITESPACE
         rule _() = [' ' | '\t' | '\n' | '\r']* {}
         /// position (short name)
@@ -12,7 +11,8 @@ peg::parser! {
         rule cr() = ['\n' | '\r'] {}
         rule ascii_digit() = ['0'..='9']
 
-        pub rule term_const() -> Cst =
+        // §1. constants
+        pub rule constant() -> Cst =
             inner:(
                 const_unit()
                 / const_bool()
@@ -56,6 +56,45 @@ peg::parser! {
             }
         rule string_quotes() -> usize = n:"`"+ {n.len()}
         rule string_inner(qs: usize) = "`"*<{qs}>
+
+        // §1. horizontal mode
+        pub rule horizontal() -> Cst = s:p() "{" _ inner:(
+            horizontal_list()
+            / horizontal_bullet_list()
+            / horizontal_single()
+        )_ "}" e:p()
+        { Cst::new(Rule::horizontal, (s, e), vec![inner]) }
+
+        pub rule horizontal_single() -> Cst =
+            inners:horizontal_token()* { Cst::new_node(Rule::horizontal_single, inners) }
+        rule horizontal_token() -> Cst =
+            _ inner: (
+                const_string()
+                / regular_text()
+                ) _
+        { inner }
+
+        pub rule regular_text() -> Cst =
+            s:p() $(!horizontal_special_char() [_])+ e:p()
+        { Cst::new_leaf(Rule::regular_text, (s, e)) }
+        rule horizontal_special_char() = ['@' | '`' | '\\' | '{' | '}' | '%' | '|' | '*' | '$' | '#' | ';']
+
+        pub rule horizontal_list() -> Cst =
+            s:p() "|" inners:horizontal_list_inner()+ e:p()
+            { Cst::new(Rule::horizontal_list, (s, e), inners) }
+        rule horizontal_list_inner() -> Cst = _ inner:horizontal_single() _ "|" {inner}
+
+        pub rule horizontal_bullet_list() -> Cst =
+            inners:horizontal_bullet()+ { Cst::new_node(Rule::horizontal_bullet_list, inners) }
+
+        pub rule horizontal_bullet() -> Cst =
+            _ star:horizontal_bullet_star() _ single:horizontal_single() _
+            { Cst::new_node(Rule::horizontal_bullet, vec![star, single]) }
+
+        pub rule horizontal_bullet_star() -> Cst =
+            s:p() "*"+ e:p()
+            { Cst::new_leaf(Rule::horizontal_bullet_star, (s, e)) }
+
 
     }
 }
