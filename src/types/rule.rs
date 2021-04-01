@@ -25,6 +25,8 @@ macro_rules! make_rule {
 }
 
 make_rule! {
+    misc,
+
     horizontal,
     horizontal_single,
     horizontal_list,
@@ -41,4 +43,7 @@ make_rule! {
     const_float,
     const_length,
     const_string,
+
+    // command
+    // inline_cmd,
 }

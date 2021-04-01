@@ -4,8 +4,9 @@ use std::fmt::Display;
 use crate::types::Cst;
 
 use crate::types::rule::Rule;
-use crate::{assert_not_parsed, assert_parsed, cst, cst_inner};
+use crate::{assert_not_parsed, assert_parsed, comp_cst, cst_inner};
 
+mod commands;
 mod constant;
 mod horizontal;
 mod term;
@@ -144,19 +145,19 @@ impl Display for CstBranchSequence {
 /// ```
 /// // 最も単純な例
 /// assert_equal!(
-///     cst!("foo" var : []),
+///     comp_cst!("foo" var : []),
 ///     CompCstText {text: "foo", rule: Rule::var, inner: Some(vec![])}
 /// );
 ///
 /// // inner に相当する箇所を `[_]` とすれば、 inner のチェックを無効化出来る
 /// assert_equal!(
-///     cst!("foo" var : [_]),
+///     comp_cst!("foo" var : [_]),
 ///     CompCstText {text: "foo", rule: Rule::var, inner: None}
 /// );
 ///
 /// // inner に相当する箇所は親と同様の文法 + セミコロン区切りで記述する
 /// assert_equal!(
-///     cst!("List.map" modvar : [
+///     comp_cst!("List.map" modvar : [
 ///         "List" module_name : [_];
 ///         "map" var_ptn : [];
 ///     ]),
@@ -169,14 +170,14 @@ impl Display for CstBranchSequence {
 /// // inner が 1 つしかなく text も同じ場合、 rule はカンマ区切りで連結させられる
 /// assert_equal!(
 ///     // parsed_ast!("foo": expr ["foo": unary [_]]) と同じことになる
-///     cst!("foo" expr, unary : [_]),
+///     comp_cst!("foo" expr, unary : [_]),
 ///     CompCstText {text: "foo", rule: Rule::expr, inner: vec![
 ///         CompCstText {text: "foo", rule: Rule::unary, inner: None}
 ///     ]}
 /// );
 /// ```
 #[macro_export]
-macro_rules! cst {
+macro_rules! comp_cst {
     ($s:literal $r:ident : $t:tt) => {
         CompCstText {
             rule: Rule::$r,
@@ -188,7 +189,7 @@ macro_rules! cst {
         CompCstText {
             rule: Rule::$r,
             text: $s.to_string(),
-            inner: Some(vec![cst!($s $($rest),+ : $t)]),
+            inner: Some(vec![comp_cst!($s $($rest),+ : $t)]),
         }
     };
 }
@@ -204,15 +205,15 @@ macro_rules! cst_inner {
     ([$s:literal $($r:ident),+ : $t:tt $(;$s2:literal $($r2:ident),+: $t2:tt)*]) => {
         Some(
         vec![
-            cst!($s $($r),+ $t),
-            $( cst!($s2 $($r2),+: $t2), )*
+            comp_cst!($s $($r),+ $t),
+            $( comp_cst!($s2 $($r2),+: $t2), )*
         ]
         )
     };
     ([$($s:literal $($r:ident),+ : $t:tt;)+]) => {
         Some(
         vec![
-            $( cst!($s $($r),+: $t), )*
+            $( comp_cst!($s $($r),+: $t), )*
         ]
         )
     };
@@ -221,8 +222,8 @@ macro_rules! cst_inner {
 #[macro_export]
 macro_rules! assert_parsed {
     ($s:literal $($rest:ident),+ : $t:tt) => {
-        let cst = cst!($s $($rest),+: $t );
-        if let Err(e) = cst.check_cst() {
+        let comp_cst = comp_cst!($s $($rest),+: $t );
+        if let Err(e) = comp_cst.check_cst() {
             panic!("assertion failed (parse failed): {}", e)
         }
     };
@@ -231,11 +232,11 @@ macro_rules! assert_parsed {
 #[macro_export]
 macro_rules! assert_not_parsed {
     ($s:literal $($rest:ident),+ : $t:tt) => {
-        let cst = cst!($s $($rest),+: $t );
-        if let Ok(pair) = cst.check_cst() {
+        let comp_cst = comp_cst!($s $($rest),+: $t );
+        if let Ok(pair) = comp_cst.check_cst() {
             panic!(
                 "assertion failed (successfully parsed): \"{}\" as {:?}. pair: {:?}",
-                cst.text, cst.rule, pair
+                comp_cst.text, comp_cst.rule, pair
             )
         }
     };

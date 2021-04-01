@@ -34,6 +34,7 @@ impl CstText {
 /// 1つの CST は構文規則、テキストの範囲、子要素からなり、全体として木構造をなす。
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub struct Cst {
+    /// 構文規則。
     pub rule: Rule,
     pub range: (usize, usize),
     pub inner: Vec<Cst>,
@@ -47,17 +48,7 @@ impl Cst {
         Self { rule, range, inner }
     }
 
-    /// Rule と range を指定して、葉に相当する（子のない） node を生成する。
-    pub fn new_leaf(rule: Rule, range: (usize, usize)) -> Self {
-        Self {
-            rule,
-            range,
-            inner: vec![],
-        }
-    }
-
-    /// Rule と子を指定して、枝に相当する（子のある） node を生成する。
-    /// 省略した range は子の range の最小・最大から計算される。
+    /// 新たな CST を作成する。
     pub fn new_node(rule: Rule, inner: Vec<Cst>) -> Self {
         let range = inner.iter().fold((usize::MAX, 0), |acc, cst| {
             let (acc_start, acc_end) = acc;
@@ -71,4 +62,45 @@ impl Cst {
         let (s, e) = self.range;
         &text[s..e]
     }
+}
+
+#[macro_export]
+macro_rules! cst {
+    ($rule:ident ($s:expr, $e:expr) [$($inner:expr),*]) => {
+        Cst {
+            rule: Rule::$rule,
+            range: ($s, $e),
+            inner: vec![$($inner),*]
+        }
+    };
+    ($rule:ident ($s:expr, $e:expr); $inner:expr) => {
+        Cst {
+            rule: Rule::$rule,
+            range: ($s, $e),
+            inner: $inner
+        }
+    };
+    ($rule:ident [$($inner:expr),*]) => {
+        Cst::new_node(Rule::$rule, vec![$($inner),*])
+    };
+    ($rule:ident; $inner:expr) => {
+        Cst::new_node(Rule::$rule, $inner)
+    };
+    ($rule:ident ($s:expr, $e:expr)) => {
+        Cst {
+            rule: Rule::$rule,
+            range: ($s, $e),
+            inner: vec![]
+        }
+    };
+    ([$($inner:expr),*]) => {
+        Cst::new_node(Rule::misc, vec![$($inner),*])
+    };
+    (($s:expr, $e:expr)) => {
+        Cst {
+            rule: Rule::misc,
+            range: ($s, $e),
+            inner: vec![]
+        }
+    };
 }
