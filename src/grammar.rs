@@ -9,14 +9,15 @@ peg::parser! {
         /// position (short name)
         rule p() -> usize = pos:position!() {pos}
         /// dummy pattern (never match)
-        rule NEVER() = !"DUMMY" "DUMMY"
+        rule DUMMY() = !"DUMMY" "DUMMY"
 
         /// return only
         rule cr() = ['\n' | '\r'] {}
         /// constants
         rule ASCII_DIGIT() = ['0'..='9']
+        rule ASCII_ALPHANUMERIC_HYPHEN() = ['a'..='z' | 'A'..='Z' | '0'..='9' | '-']
 
-        pub rule misc() -> Cst = NEVER() { cst!((0, 0)) }
+        pub rule misc() -> Cst = DUMMY() { cst!((0, 0)) }
 
         // §1. constants
         pub rule constant() -> Cst =
@@ -74,10 +75,14 @@ peg::parser! {
 
         pub rule horizontal_single() -> Cst =
             inners:horizontal_token()* { cst!(horizontal_single; inners) }
+
         rule horizontal_token() -> Cst =
             _ inner: (
                 const_string()
-                // / inline_cmd()
+                / inline_cmd()
+                / inline_text_embedding()
+                / math_text()
+                / horizontal_escaped_char()
                 / regular_text()
                 ) _
         { inner }
@@ -85,7 +90,13 @@ peg::parser! {
         pub rule regular_text() -> Cst =
             s:p() $(!horizontal_special_char() [_])+ e:p()
         { cst!(regular_text (s, e)) }
-        rule horizontal_special_char() = ['@' | '`' | '\\' | '{' | '}' | '%' | '|' | '*' | '$' | '#' | ';']
+
+        rule horizontal_escaped_char() -> Cst =
+            s:p() "\\" horizontal_special_char() e:p()
+        { cst!((s, e)) }
+
+        rule horizontal_special_char() =
+            ['@' | '`' | '\\' | '{' | '}' | '%' | '|' | '*' | '$' | '#' | ';']
 
         pub rule horizontal_list() -> Cst =
             s:p() "|" inners:horizontal_list_inner()+ e:p()
@@ -103,18 +114,96 @@ peg::parser! {
             s:p() "*"+ e:p()
             { cst!(horizontal_bullet_star (s, e)) }
 
-        // §1. commands
-        // pub rule inline_cmd() -> Cst =
-        //     s:p() inline_cmd_name() e:p()
-        // { Cst::new_leaf(Rule::inline_cmd, (s, e)) }
-        // pub rule inline_cmd_name() -> Cst =
-        //     s:p() r"\" inner:(modvar() / var_ptn()) e:p()
-        // { Cst::new_leaf(Rule::inline_cmd, (s, e)) }
+        // §1. vertical mode
 
-        // rule var_ptn() -> Cst =
-        //
-        rule dummy() -> Cst =
-            s:p() NEVER() e:p()
+        rule vertical() -> Cst =
+            s:p() DUMMY() e:p()
+        { cst!((s, e)) }
+
+        // §1. commands
+        pub rule inline_cmd() -> Cst = (
+            // \cmd()()...(); のパターン
+            s:p() name:inline_cmd_name() _
+            opts:((cmd_expr_arg() / cmd_expr_option())** _) _ ";" e:p()
+            {
+                cst!(inline_cmd (s, e); [vec![name], opts].concat())
+            }
+            /
+            // \cmd()()...(){}<>...{} のパターン
+            s:p() name:inline_cmd_name() _
+            opt:((cmd_expr_arg() / cmd_expr_option())** _) opttext:(cmd_text_arg() ++ _) e:p()
+            {
+                cst!(inline_cmd (s, e); [vec![name], opt, opttext].concat())
+            }
+        )
+
+        pub rule inline_cmd_name() -> Cst =
+            s:p() r"\" inner:(modvar() / var_ptn()) e:p()
+        { cst!(inline_cmd_name (s, e) [inner]) }
+
+        rule cmd_expr_arg() -> Cst =
+            s:p() inner:(
+                const_unit()
+                / ("(" _ inner:expr() _ ")" { inner })
+                / list()
+                / record()
+                ) e:p()
+        { inner }
+
+        rule cmd_expr_option() -> Cst =
+            s:p() "?:" _ inner:cmd_expr_arg() e:p() { cst!((s, e) [inner]) }
+            / s:p() "?*" e:p() { cst!((s, e)) }
+
+        rule cmd_text_arg() -> Cst = vertical() / horizontal()
+
+        pub rule inline_text_embedding() -> Cst =
+            s:p() "#" _ inner:(var_ptn() / modvar()) _ ";" e:p()
+        { cst!(inline_text_embedding (s, e) [inner]) }
+
+        // §1. expr
+        rule expr() -> Cst =
+            s:p() DUMMY() e:p()
+        { cst!((s, e)) }
+
+        rule list() -> Cst =
+            s:p() DUMMY() e:p()
+        { cst!((s, e)) }
+
+        rule record() -> Cst =
+            s:p() DUMMY() e:p()
+        { cst!((s, e)) }
+
+        // §1. uncategorized
+
+        pub rule var() -> Cst =
+            s:p() !(reserved_word() ASCII_ALPHANUMERIC_HYPHEN()) var_ptn() e:p()
+        { cst!(var (s, e)) }
+
+        pub rule var_ptn() -> Cst =
+            s:p() ['a'..='z'] ASCII_ALPHANUMERIC_HYPHEN()* e:p()
+        { cst!(var_ptn (s, e)) }
+
+        // 予約語たち
+        rule reserved_word() =
+            ( "constraint"
+            / "inline-cmd" / "block-cmd" / "math-cmd"
+            / "let-mutable" / "let-inline" / "let-block" / "let-math" / "let-rec"
+            / "controls" / "command" / "before" / "module" / "direct" / "struct"
+            / "cycle" / "match" / "while" / "false"
+            / "else" / "open" / "then" / "true" / "type" / "when" / "with"
+            / "and" / "end" / "fun" / "let" / "mod" / "not" / "sig" / "val"
+            / "as" / "do" / "if" / "in" / "of")
+
+        pub rule modvar() -> Cst =
+            s:p() modname:module_name() _ "." _ var:var_ptn() e:p()
+        { cst!(modvar (s, e) [modname, var]) }
+
+        pub rule module_name() -> Cst =
+            s:p() DUMMY() e:p()
+        { cst!(module_name (s, e)) }
+
+        rule math_text() -> Cst =
+            s:p() DUMMY() e:p()
         { cst!((s, e)) }
 
     }

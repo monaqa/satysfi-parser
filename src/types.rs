@@ -66,6 +66,11 @@ impl Cst {
 
 #[macro_export]
 macro_rules! cst {
+    // - Rule name: 省略可能
+    // - range: inner があるときのみ省略可能
+    // - inner: 省略可能、リストの形で直接記載可能
+
+    // 省略なし + inner リスト形式
     ($rule:ident ($s:expr, $e:expr) [$($inner:expr),*]) => {
         Cst {
             rule: Rule::$rule,
@@ -73,6 +78,7 @@ macro_rules! cst {
             inner: vec![$($inner),*]
         }
     };
+    // 省略なし
     ($rule:ident ($s:expr, $e:expr); $inner:expr) => {
         Cst {
             rule: Rule::$rule,
@@ -80,12 +86,16 @@ macro_rules! cst {
             inner: $inner
         }
     };
+
+    // range 省略
     ($rule:ident [$($inner:expr),*]) => {
         Cst::new_node(Rule::$rule, vec![$($inner),*])
     };
     ($rule:ident; $inner:expr) => {
         Cst::new_node(Rule::$rule, $inner)
     };
+
+    // inner 省略
     ($rule:ident ($s:expr, $e:expr)) => {
         Cst {
             rule: Rule::$rule,
@@ -93,9 +103,29 @@ macro_rules! cst {
             inner: vec![]
         }
     };
+
+    // rule 省略
+    (($s:expr, $e:expr) [$($inner:expr),*]) => {
+        Cst {
+            rule: Rule::misc,
+            range: ($s, $e),
+            inner: vec![$($inner),*]
+        }
+    };
+    (($s:expr, $e:expr); $inner:expr) => {
+        Cst {
+            rule: Rule::misc,
+            range: ($s, $e),
+            inner: $inner
+        }
+    };
+
+    // rule, range 省略
     ([$($inner:expr),*]) => {
         Cst::new_node(Rule::misc, vec![$($inner),*])
     };
+
+    // rule, inner 省略
     (($s:expr, $e:expr)) => {
         Cst {
             rule: Rule::misc,

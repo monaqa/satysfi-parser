@@ -24,6 +24,7 @@ macro_rules! make_rule {
     };
 }
 
+// TODO: expand macro when all implementation has done
 make_rule! {
     misc,
 
@@ -34,6 +35,7 @@ make_rule! {
     horizontal_bullet,
     horizontal_bullet_star,
     regular_text,
+    inline_text_embedding,
 
     // constants
     constant,
@@ -45,5 +47,12 @@ make_rule! {
     const_string,
 
     // command
-    // inline_cmd,
+    inline_cmd,
+    inline_cmd_name,
+
+    // expr
+    module_name,
+    modvar,
+    var,
+    var_ptn,
 }
