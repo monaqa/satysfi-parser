@@ -2,21 +2,26 @@ use super::*;
 
 #[test]
 fn horizontal() {
-    assert_parsed!("{}" horizontal: [_]);
-    assert_parsed!("{aaa}" horizontal: [_]);
-    assert_parsed!("{|aaa|}" horizontal: [_]);
-    assert_parsed!("{* aaa}" horizontal: [_]);
+    assert_parsed!("" horizontal: [_]);
+    assert_parsed!("aaa" horizontal: [_]);
+    assert_parsed!("|aaa|" horizontal: [_]);
+    assert_parsed!("* aaa" horizontal: [_]);
 }
 
 #[test]
 fn horizontal_recursive() {
-    assert_parsed!(r"{\a;}" horizontal: [
+    assert_parsed!(r"\a;" horizontal: [
         r"\a;" horizontal_single, inline_cmd: [
             r"\a" inline_cmd_name: ["a" var_ptn: [];];
         ];
     ]);
 
-    assert_parsed!(r"{\a{}}" horizontal: [_]);
+    assert_parsed!(r"\a{}" horizontal: [_]);
+    assert_parsed!(r"\a{\a{}}" horizontal: [_]);
+    assert_parsed!(r"\a{\a{\a{}}}" horizontal: [_]);
+    assert_parsed!(r"\a{\a{\a{\a{}}}}" horizontal: [_]);
+    assert_parsed!(r"\a{\a{\a{\a{\a{}}}}}" horizontal: [_]);
+    assert_parsed!(r"\a{\a{\a{\a{\a{\a{}}}}}}" horizontal: [_]);
 }
 
 #[test]
@@ -38,11 +43,6 @@ fn horizontal_single() {
 fn inline_cmd() {
     assert_parsed!(r"\a;" inline_cmd: [_]);
     assert_parsed!(r"\a{}" inline_cmd: [_]);
-    assert_parsed!(r"\a{\a{}}" inline_cmd: [_]);
-    assert_parsed!(r"\a{\a{\a{}}}" inline_cmd: [_]);
-    assert_parsed!(r"\a{\a{\a{\a{}}}}" inline_cmd: [_]);
-    assert_parsed!(r"\a{\a{\a{\a{\a{}}}}}" inline_cmd: [_]);
-    assert_parsed!(r"\a{\a{\a{\a{\a{\a{}}}}}}" inline_cmd: [_]);
 }
 
 #[test]

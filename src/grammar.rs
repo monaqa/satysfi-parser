@@ -66,11 +66,11 @@ peg::parser! {
         rule string_inner(qs: usize) = "`"*<{qs}>
 
         // §1. horizontal mode
-        pub rule horizontal() -> Cst = s:p() "{" _ inner:(
+        pub rule horizontal() -> Cst = s:p() inner:(
             horizontal_list()
             / horizontal_bullet_list()
             / horizontal_single()
-        )_ "}" e:p()
+        ) e:p()
         { cst!(horizontal (s, e) [inner]) }
 
         pub rule horizontal_single() -> Cst =
@@ -154,7 +154,9 @@ peg::parser! {
             s:p() "?:" _ inner:cmd_expr_arg() e:p() { cst!((s, e) [inner]) }
             / s:p() "?*" e:p() { cst!((s, e)) }
 
-        rule cmd_text_arg() -> Cst = vertical() / horizontal()
+        rule cmd_text_arg() -> Cst =
+            "<" _ inner:vertical() _ ">" {inner}
+            / "{" _ inner:horizontal() _ "}" {inner}
 
         pub rule inline_text_embedding() -> Cst =
             s:p() "#" _ inner:(var_ptn() / modvar()) _ ";" e:p()
@@ -162,6 +164,50 @@ peg::parser! {
 
         // §1. expr
         rule expr() -> Cst =
+            s:p() inner:() e:p()
+        { cst!((s, e)) }
+
+        rule match_expr() -> Cst =
+            s:p() DUMMY() e:p()
+        { cst!((s, e)) }
+
+        rule ctrl_while() -> Cst =
+            s:p() DUMMY() e:p()
+        { cst!((s, e)) }
+
+        rule ctrl_if() -> Cst =
+            s:p() DUMMY() e:p()
+        { cst!((s, e)) }
+
+        rule lambda() -> Cst =
+            s:p() DUMMY() e:p()
+        { cst!((s, e)) }
+
+        rule assignment() -> Cst =
+            s:p() DUMMY() e:p()
+        { cst!((s, e)) }
+
+        rule dyadic_expr() -> Cst =
+            s:p() DUMMY() e:p()
+        { cst!((s, e)) }
+
+        rule unary_operator_expr() -> Cst =
+            s:p() DUMMY() e:p()
+        { cst!((s, e)) }
+
+        rule application() -> Cst =
+            s:p() DUMMY() e:p()
+        { cst!((s, e)) }
+
+        rule record_member() -> Cst =
+            s:p() DUMMY() e:p()
+        { cst!((s, e)) }
+
+        rule variant_constructor() -> Cst =
+            s:p() DUMMY() e:p()
+        { cst!((s, e)) }
+
+        rule unary() -> Cst =
             s:p() DUMMY() e:p()
         { cst!((s, e)) }
 
