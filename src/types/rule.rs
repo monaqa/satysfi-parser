@@ -28,6 +28,15 @@ macro_rules! make_rule {
 make_rule! {
     misc,
 
+    program_saty,
+    program_satyh,
+
+    stage,
+    headers,
+    header_require,
+    header_import,
+    pkgname,
+
     horizontal,
     horizontal_single,
     horizontal_list,

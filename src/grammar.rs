@@ -2,64 +2,84 @@ use crate::cst;
 use crate::types::rule::Rule;
 use crate::types::Cst;
 
+/// Some のものだけ集めてベクタにする。
+fn filt(v: Vec<Option<Cst>>) -> Vec<Cst> {
+    v.into_iter().filter_map(|e| e).collect()
+}
+
 peg::parser! {
     pub grammar satysfi_parser() for str {
+        // §1. program
+
         /// WHITESPACE
-        rule _() = [' ' | '\t' | '\n' | '\r']* {}
-        /// position (short name)
+        rule _() = ([' ' | '\t' | '\n' | '\r'] / comment())*
+        rule __() = [' ' | '\t' | '\n' | '\r']*
+        /// alias for position
         rule p() -> usize = pos:position!() {pos}
         /// dummy pattern (never match)
         rule DUMMY() = !"DUMMY" "DUMMY"
+        /// end of file
+        rule EOF() = ![_]
 
-        /// return only
-        rule cr() = ['\n' | '\r'] {}
+        /// arbitrary character except line feed
+        rule NON_LF() = !['\r' | '\n'] [_]
+
         /// constants
         rule ASCII_DIGIT() = ['0'..='9']
         rule ASCII_ALPHANUMERIC_HYPHEN() = ['a'..='z' | 'A'..='Z' | '0'..='9' | '-']
 
         pub rule misc() -> Cst = DUMMY() { cst!((0, 0)) }
 
-        // §1. program
+        /// comment
+        rule comment() = "%" comment_inner() ['\r' | '\n']
+        rule comment_inner() = NON_LF()*
 
-        rule program() -> Cst = program_saty() / program_satyh()
+        pub rule program() -> Cst = program_saty() / program_satyh()
 
-        rule program_saty() -> Cst =
-            s:p() DUMMY() e:p()
-        { cst!((s, e)) }
+        pub rule program_saty() -> Cst =
+            s:p() _
+            stage:header_stage()? _
+            headers:headers() _
+            pre:(pre:preamble() _ "in" {pre})? _
+            expr:expr() _
+            e:p()
+        { cst!(program_saty (s, e); filt(vec![stage, Some(headers), pre, Some(expr)])) }
 
-        rule program_satyh() -> Cst =
-            s:p() DUMMY() e:p()
-        { cst!((s, e)) }
+        pub rule program_satyh() -> Cst =
+            s:p() _
+            stage:header_stage()? _
+            headers:headers() _
+            pre:preamble() _
+            e:p()
+        { cst!(program_satyh (s, e); filt(vec![stage, Some(headers), Some(pre) ])) }
 
         // §1. header
 
         rule header_stage() -> Cst =
-            s:p() DUMMY() e:p()
-        { cst!((s, e)) }
+            "@stage:" [' ' | '\t']* stg:stage() [' ' | '\t']* ['\r' | '\n']
+        {stg}
 
-        rule stage() -> Cst =
-            s:p() DUMMY() e:p()
-        { cst!((s, e)) }
+        pub rule stage() -> Cst =
+            s:p() ("0" / "1" / "persistent") e:p()
+        { cst!(stage (s, e)) }
 
-        rule headers() -> Cst =
-            s:p() DUMMY() e:p()
-        { cst!((s, e)) }
+        pub rule headers() -> Cst =
+            s:p() v:(h: header() _ {h})* e:p()
+        { cst!(headers (s, e); v) }
 
-        rule header() -> Cst =
-            s:p() DUMMY() e:p()
-        { cst!((s, e)) }
+        rule header() -> Cst = header_require() / header_import()
 
-        rule header_require() -> Cst =
-            s:p() DUMMY() e:p()
-        { cst!((s, e)) }
+        pub rule header_require() -> Cst =
+            s:p() "@require:" [' ' | '\t']* pkg:pkgname() ['\n' | '\r'] e:p()
+        { cst!(header_require (s, e) [pkg]) }
 
-        rule header_import() -> Cst =
-            s:p() DUMMY() e:p()
-        { cst!((s, e)) }
+        pub rule header_import() -> Cst =
+            s:p() "@import:" [' ' | '\t']* pkg:pkgname() ['\n' | '\r'] e:p()
+        { cst!(header_import (s, e) [pkg]) }
 
-        rule pkgname() -> Cst =
-            s:p() DUMMY() e:p()
-        { cst!((s, e)) }
+        pub rule pkgname() -> Cst =
+            s:p() NON_LF()+ e:p()
+        { cst!(pkgname (s, e)) }
 
         // §1. statement
 
