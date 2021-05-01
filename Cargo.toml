@@ -12,3 +12,10 @@ itertools = "0.10.0"
 log = "0.4.14"
 peg = "0.6.3"
 thiserror = "1.0.24"
+
+[dev-dependencies]
+criterion = "0.3.4"
+
+[[bench]]
+name = "packrat"
+harness = false

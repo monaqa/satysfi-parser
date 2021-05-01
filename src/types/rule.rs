@@ -31,11 +31,25 @@ make_rule! {
     program_saty,
     program_satyh,
 
+    // header
     stage,
     headers,
     header_require,
     header_import,
     pkgname,
+
+    // types
+    type_expr,
+    type_optional,
+    type_prod,
+    type_list,
+    type_list_unit_optional,
+    type_application,
+    type_name,
+    type_record,
+    type_record_unit,
+    type_param,
+    constraint,
 
     horizontal,
     horizontal_single,

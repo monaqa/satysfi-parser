@@ -11,6 +11,7 @@ mod constant;
 mod header;
 mod horizontal;
 mod term;
+mod types;
 
 use itertools::Itertools;
 use peg::str::LineCol;

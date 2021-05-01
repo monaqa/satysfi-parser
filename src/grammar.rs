@@ -2,9 +2,61 @@ use crate::cst;
 use crate::types::rule::Rule;
 use crate::types::Cst;
 
-/// Some のものだけ集めてベクタにする。
-fn filt(v: Vec<Option<Cst>>) -> Vec<Cst> {
-    v.into_iter().filter_map(|e| e).collect()
+trait Vectorize<T> {
+    /// 色んなものを強引に vector にしてしまう恐ろしいメソッド。
+    /// 構文解析ではオプショナルな構文要素があったり、配列状の構文要素があったりするため
+    /// それらを楽にまとめて1つの Vec に格納してしまうための処置。
+    fn into_vec(self) -> Vec<T>;
+}
+
+impl<T> Vectorize<T> for Vec<T> {
+    /// vec![t] のときはそのまま
+    fn into_vec(self) -> Vec<T> {
+        self
+    }
+}
+
+impl<T> Vectorize<T> for T {
+    /// t のときは vec![t] に変換される
+    fn into_vec(self) -> Vec<T> {
+        vec![self]
+    }
+}
+
+impl<T> Vectorize<T> for Vec<Vec<T>> {
+    /// T の可変長配列の concat が一発でできる
+    fn into_vec(self) -> Vec<T> {
+        let mut vec = vec![];
+        for v in self {
+            vec.extend(v);
+        }
+        vec
+    }
+}
+
+impl<T> Vectorize<T> for Option<T> {
+    /// Some(t) は vec![t] に、 None は vec![] に変換される
+    fn into_vec(self) -> Vec<T> {
+        self.into_iter().collect()
+    }
+}
+
+impl<T> Vectorize<T> for Vec<Option<T>> {
+    /// vec![ Some(a), None, Some(c), Some(d), None ] は vec![a, c, d] になる
+    fn into_vec(self) -> Vec<T> {
+        self.into_iter().filter_map(|e| e).collect()
+    }
+}
+
+/// 様々な型の変数をごちゃまぜに書くと、それをまとめて Vec<T> にしてくれる。
+///
+/// ```
+/// assert_equal!(vectorize![1, vec![2, 3, 4], Some(5)], vec![1, 2, 3, 4])
+/// ```
+macro_rules! vectorize {
+    ($($e:expr),*) => {
+        vec![$($e.into_vec()),*].into_vec()
+    };
 }
 
 peg::parser! {
@@ -43,7 +95,7 @@ peg::parser! {
             pre:(pre:preamble() _ "in" {pre})? _
             expr:expr() _
             e:p()
-        { cst!(program_saty (s, e); filt(vec![stage, Some(headers), pre, Some(expr)])) }
+        { cst!(program_saty (s, e); vectorize![stage, headers, pre, expr]) }
 
         pub rule program_satyh() -> Cst =
             s:p() _
@@ -51,7 +103,7 @@ peg::parser! {
             headers:headers() _
             pre:preamble() _
             e:p()
-        { cst!(program_satyh (s, e); filt(vec![stage, Some(headers), Some(pre) ])) }
+        { cst!(program_satyh (s, e); vectorize![stage, headers, pre]) }
 
         // §1. header
 
@@ -199,61 +251,81 @@ peg::parser! {
 
         // §1. types
 
-        rule type_expr() -> Cst =
-            s:p() DUMMY() e:p()
-        { cst!((s, e)) }
+        pub rule type_expr() -> Cst =
+            s:p()
+            typeopts:(t:type_optional() _ "?->" _ {t})* _
+            typeprods:(t:type_prod() _ "->" _ {t})* _
+            typeprod:type_prod()
+            e:p()
+        {
+            cst!(type_expr (s, e); vectorize![typeopts, typeprods, typeprod])
+        }
 
-        rule type_optional_name() -> Cst =
-            s:p() DUMMY() e:p()
-        { cst!((s, e)) }
+        pub rule type_optional() -> Cst = s:p() t:type_prod() e:p() { cst!(type_optional (s, e); t.inner) }
 
-        rule type_prod() -> Cst =
-            s:p() DUMMY() e:p()
-        { cst!((s, e)) }
+        pub rule type_prod() -> Cst =
+            s:p() t:type_unary() ts:(_ "*" _ t:type_unary() {t})* e:p()
+        {
+            cst!(type_prod (s, e); vectorize![t, ts])
+        }
 
-        rule type_unarry() -> Cst =
-            s:p() DUMMY() e:p()
-        { cst!((s, e)) }
+        #[cache]
+        rule type_unary() -> Cst =
+            t:type_list() _ "inline-cmd" {t}
+            / t:type_list() _ "block-cmd" {t}
+            / t:type_list() _ "math-cmd" {t}
+            / type_application()
+            / "(" _ t:type_expr() _ ")" {t}
+            / type_record()
+            / type_param()
 
-        rule type_application() -> Cst =
-            s:p() DUMMY() e:p()
-        { cst!((s, e)) }
-
-        rule type_application_unit() -> Cst =
-            s:p() DUMMY() e:p()
-        { cst!((s, e)) }
-
-        rule type_name() -> Cst =
-            s:p() DUMMY() e:p()
-        { cst!((s, e)) }
-
-        rule type_kist() -> Cst =
-            s:p() DUMMY() e:p()
-        { cst!((s, e)) }
+        pub rule type_list() -> Cst =
+            s:p() "[" _ "]" e:p() { cst!((s, e)) }
+            / s:p() "[" _ t:type_list_unit()
+                ts:(_ ";" _ t:type_list_unit() {t})* _
+                ";"? _ "]" e:p()
+                { cst!(type_list (s, e); vectorize![t, ts]) }
 
         rule type_list_unit() -> Cst =
-            s:p() DUMMY() e:p()
-        { cst!((s, e)) }
+            t:type_list_unit_optional() _ "?" {t}
+            / type_expr()
 
-        rule type_record() -> Cst =
-            s:p() DUMMY() e:p()
-        { cst!((s, e)) }
+        pub rule type_list_unit_optional() -> Cst =
+            s:p() t:type_prod() e:p()
+        { cst!(type_list_unit_optional (s, e); t.inner) }
 
-        rule type_record_inner() -> Cst =
-            s:p() DUMMY() e:p()
-        { cst!((s, e)) }
+        pub rule type_application() -> Cst =
+            s:p() t:type_application_unit() _ ts:(type_application_unit()** _) e:p()
+        { cst!(type_application (s, e); vectorize![t, ts]) }
 
-        rule type_record_unit() -> Cst =
-            s:p() DUMMY() e:p()
-        { cst!((s, e)) }
+        rule type_application_unit() -> Cst =
+            "(" _ t:type_expr() _ ")" {t}
+            / type_param()
+            / type_name()
 
-        rule type_param() -> Cst =
-            s:p() DUMMY() e:p()
-        { cst!((s, e)) }
+        pub rule type_name() -> Cst =
+            s:p() t:(var() / modvar()) e:p()
+        { cst!(type_name (s, e) [t]) }
 
-        rule constraint() -> Cst =
-            s:p() DUMMY() e:p()
-        { cst!((s, e)) }
+        pub rule type_record() -> Cst =
+            s:p() "(" _ "|" _ "|" _ ")" e:p() { cst!(type_record (s, e)) }
+            / s:p() "(" _ "|" _ t:type_record_inner() _ "|" _ ")" e:p() { cst!(type_record (s, e); t) }
+
+        rule type_record_inner() -> Vec<Cst> =
+            s:p() t:type_record_unit() _ ts:(type_record_unit() ** (_ ";" _)) _ ";"? e:p()
+        { vectorize![t, ts] }
+
+        pub rule type_record_unit() -> Cst =
+            s:p() v:var() _ ":" _ t:type_expr() e:p()
+        { cst!(type_record_unit (s, e) [v, t]) }
+
+        pub rule type_param() -> Cst =
+            s:p() "'" _ t:var_ptn() e:p()
+        { cst!(type_param (s, e) [t]) }
+
+        pub rule constraint() -> Cst =
+            s:p() "constraint" t:type_param() _ "::" _ r:type_record() e:p()
+        { cst!(constraint (s, e) [t, r]) }
 
         // §1. pattern
 
@@ -386,7 +458,7 @@ peg::parser! {
         { cst!((s, e)) }
 
         pub rule var() -> Cst =
-            s:p() !(reserved_word() ASCII_ALPHANUMERIC_HYPHEN()) var_ptn() e:p()
+            s:p() !(reserved_word() !ASCII_ALPHANUMERIC_HYPHEN()) var_ptn() e:p()
         { cst!(var (s, e)) }
 
         pub rule var_ptn() -> Cst =
