@@ -51,13 +51,17 @@ make_rule! {
     type_param,
     constraint,
 
-    horizontal,
+    // expr
+    math_text,
+
+    // horizontal
     horizontal_single,
     horizontal_list,
     horizontal_bullet_list,
     horizontal_bullet,
     horizontal_bullet_star,
     regular_text,
+    horizontal_escaped_char,
     inline_text_embedding,
 
     vertical,

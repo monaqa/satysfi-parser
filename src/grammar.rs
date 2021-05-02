@@ -457,9 +457,9 @@ peg::parser! {
             s:p() "{" _ h:horizontal() _ "}" e:p()
         { cst!((s, e) [h]) }
 
-        rule math_text() -> Cst =
+        pub rule math_text() -> Cst =
             s:p() "${" _ m:math() _ "}" e:p()
-        { cst!((s, e) [m]) }
+        { cst!(math_text (s, e) [m]) }
 
         rule record() -> Cst =
             s:p() "(" _ "|" _ "|" _ ")" e:p() { cst!((s, e)) }
@@ -642,26 +642,21 @@ peg::parser! {
             s:p() "?:" _ arg:math_cmd_expr_arg() e:p() { cst!((s, e) [arg]) }
 
         // §1. horizontal mode
-        pub rule horizontal() -> Cst = s:p() inner:(
+        rule horizontal() -> Cst =
             horizontal_list()
             / horizontal_bullet_list()
             / horizontal_single()
-        ) e:p()
-        { cst!(horizontal (s, e) [inner]) }
 
         pub rule horizontal_single() -> Cst =
-            inners:horizontal_token()* { cst!(horizontal_single; inners) }
+            s:p() inners:horizontal_token()* e:p() { cst!(horizontal_single (s, e) [inners]) }
 
         rule horizontal_token() -> Cst =
-            _ inner: (
-                const_string()
-                / inline_cmd()
-                / inline_text_embedding()
-                / math_text()
-                / horizontal_escaped_char()
-                / regular_text()
-                ) _
-        { inner }
+            const_string()
+            / inline_cmd()
+            / inline_text_embedding()
+            / math_text()
+            / horizontal_escaped_char()
+            / regular_text()
 
         pub rule inline_text_embedding() -> Cst =
             s:p() "#" _ inner:(var_ptn() / modvar()) _ ";" e:p()
@@ -671,16 +666,16 @@ peg::parser! {
             s:p() $(!horizontal_special_char() [_])+ e:p()
         { cst!(regular_text (s, e)) }
 
-        rule horizontal_escaped_char() -> Cst =
+        pub rule horizontal_escaped_char() -> Cst =
             s:p() "\\" horizontal_special_char() e:p()
-        { cst!((s, e)) }
+        { cst!(horizontal_escaped_char (s, e)) }
 
         rule horizontal_special_char() =
             ['@' | '`' | '\\' | '{' | '}' | '%' | '|' | '*' | '$' | '#' | ';']
 
         pub rule horizontal_list() -> Cst =
             s:p() "|" inners:horizontal_list_inner()+ e:p()
-            { cst!(horizontal_list (s, e); inners) }
+            { cst!(horizontal_list (s, e) [inners]) }
         rule horizontal_list_inner() -> Cst = _ inner:horizontal_single() _ "|" {inner}
 
         pub rule horizontal_bullet_list() -> Cst =
