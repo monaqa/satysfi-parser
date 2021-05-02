@@ -1,5 +1,51 @@
 use self::rule::Rule;
 
+pub trait Vectorize<T> {
+    /// 色んなものを強引に vector にしてしまう恐ろしいメソッド。
+    /// 構文解析ではオプショナルな構文要素があったり、配列状の構文要素があったりするため
+    /// それらを楽にまとめて1つの Vec に格納してしまうための処置。
+    fn vectorize(self) -> Vec<T>;
+}
+
+impl<T> Vectorize<T> for Vec<T> {
+    /// vec![t] のときはそのまま
+    fn vectorize(self) -> Vec<T> {
+        self
+    }
+}
+
+impl<T> Vectorize<T> for T {
+    /// t のときは vec![t] に変換される
+    fn vectorize(self) -> Vec<T> {
+        vec![self]
+    }
+}
+
+impl<T> Vectorize<T> for Vec<Vec<T>> {
+    /// T の可変長配列の concat が一発でできる
+    fn vectorize(self) -> Vec<T> {
+        let mut vec = vec![];
+        for v in self {
+            vec.extend(v);
+        }
+        vec
+    }
+}
+
+impl<T> Vectorize<T> for Option<T> {
+    /// Some(t) は vec![t] に、 None は vec![] に変換される
+    fn vectorize(self) -> Vec<T> {
+        self.into_iter().collect()
+    }
+}
+
+impl<T> Vectorize<T> for Vec<Option<T>> {
+    /// vec![ Some(a), None, Some(c), Some(d), None ] は vec![a, c, d] になる
+    fn vectorize(self) -> Vec<T> {
+        self.into_iter().filter_map(|e| e).collect()
+    }
+}
+
 /// CST にテキストの情報を付加したもの。
 // TODO: 自己参照構造体にする。
 #[derive(Debug, PartialEq, Eq)]
@@ -75,7 +121,7 @@ macro_rules! cst {
         Cst {
             rule: Rule::$rule,
             range: ($s, $e),
-            inner: vec![$($inner),*]
+            inner: vec![$($inner.vectorize()),*].vectorize()
         }
     };
     // 省略なし
@@ -89,7 +135,7 @@ macro_rules! cst {
 
     // range 省略
     ($rule:ident [$($inner:expr),*]) => {
-        Cst::new_node(Rule::$rule, vec![$($inner),*])
+        Cst::new_node(Rule::$rule, vec![$($inner.vectorize()),*].vectorize())
     };
     ($rule:ident; $inner:expr) => {
         Cst::new_node(Rule::$rule, $inner)
@@ -109,7 +155,7 @@ macro_rules! cst {
         Cst {
             rule: Rule::misc,
             range: ($s, $e),
-            inner: vec![$($inner),*]
+            inner: vec![$($inner.vectorize()),*].vectorize()
         }
     };
     (($s:expr, $e:expr); $inner:expr) => {
@@ -122,7 +168,7 @@ macro_rules! cst {
 
     // rule, range 省略
     ([$($inner:expr),*]) => {
-        Cst::new_node(Rule::misc, vec![$($inner),*])
+        Cst::new_node(Rule::misc, vec![$($inner.vectorize()),*].vectorize())
     };
 
     // rule, inner 省略

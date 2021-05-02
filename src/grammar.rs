@@ -1,67 +1,24 @@
 use crate::cst;
 use crate::types::rule::Rule;
-use crate::types::Cst;
-
-trait Vectorize<T> {
-    /// 色んなものを強引に vector にしてしまう恐ろしいメソッド。
-    /// 構文解析ではオプショナルな構文要素があったり、配列状の構文要素があったりするため
-    /// それらを楽にまとめて1つの Vec に格納してしまうための処置。
-    fn into_vec(self) -> Vec<T>;
-}
-
-impl<T> Vectorize<T> for Vec<T> {
-    /// vec![t] のときはそのまま
-    fn into_vec(self) -> Vec<T> {
-        self
-    }
-}
-
-impl<T> Vectorize<T> for T {
-    /// t のときは vec![t] に変換される
-    fn into_vec(self) -> Vec<T> {
-        vec![self]
-    }
-}
-
-impl<T> Vectorize<T> for Vec<Vec<T>> {
-    /// T の可変長配列の concat が一発でできる
-    fn into_vec(self) -> Vec<T> {
-        let mut vec = vec![];
-        for v in self {
-            vec.extend(v);
-        }
-        vec
-    }
-}
-
-impl<T> Vectorize<T> for Option<T> {
-    /// Some(t) は vec![t] に、 None は vec![] に変換される
-    fn into_vec(self) -> Vec<T> {
-        self.into_iter().collect()
-    }
-}
-
-impl<T> Vectorize<T> for Vec<Option<T>> {
-    /// vec![ Some(a), None, Some(c), Some(d), None ] は vec![a, c, d] になる
-    fn into_vec(self) -> Vec<T> {
-        self.into_iter().filter_map(|e| e).collect()
-    }
-}
+use crate::types::{Cst, Vectorize};
 
 /// 様々な型の変数をごちゃまぜに書くと、それをまとめて Vec<T> にしてくれる。
 ///
 /// ```
-/// assert_equal!(vectorize![1, vec![2, 3, 4], Some(5)], vec![1, 2, 3, 4])
+/// #[macro_use] extern crate satysfi_parser;
+/// use satysfi_parser::types::Vectorize;
+/// let v: Vec<usize> = vectorize![1, vec![2, 3, 4], None, Some(5)];
+/// assert_eq!(v, vec![1, 2, 3, 4, 5])
 /// ```
 macro_rules! vectorize {
     ($($e:expr),*) => {
-        vec![$($e.into_vec()),*].into_vec()
+        vec![$($e.vectorize()),*].vectorize()
     };
 }
 
 peg::parser! {
     pub grammar satysfi_parser() for str {
-        // §1. program
+        // §1. common
 
         /// WHITESPACE
         rule _() = ([' ' | '\t' | '\n' | '\r'] / comment())*
@@ -80,11 +37,18 @@ peg::parser! {
         rule ASCII_DIGIT() = ['0'..='9']
         rule ASCII_ALPHANUMERIC_HYPHEN() = ['a'..='z' | 'A'..='Z' | '0'..='9' | '-']
 
+        /// keywords
+        /// 例えば kwd("let") とすると、
+        /// "let" にはマッチするが "leti" や "let-inline" にはマッチしなくなる。
+        rule kwd(word: &str) = ({word}) !ASCII_ALPHANUMERIC_HYPHEN()
+
         pub rule misc() -> Cst = DUMMY() { cst!((0, 0)) }
 
         /// comment
         rule comment() = "%" comment_inner() ['\r' | '\n']
         rule comment_inner() = NON_LF()*
+
+        // §1. program
 
         pub rule program() -> Cst = program_saty() / program_satyh()
 
@@ -95,7 +59,7 @@ peg::parser! {
             pre:(pre:preamble() _ "in" {pre})? _
             expr:expr() _
             e:p()
-        { cst!(program_saty (s, e); vectorize![stage, headers, pre, expr]) }
+        { cst!(program_saty (s, e) [stage, headers, pre, expr]) }
 
         pub rule program_satyh() -> Cst =
             s:p() _
@@ -103,7 +67,7 @@ peg::parser! {
             headers:headers() _
             pre:preamble() _
             e:p()
-        { cst!(program_satyh (s, e); vectorize![stage, headers, pre]) }
+        { cst!(program_satyh (s, e) [stage, headers, pre]) }
 
         // §1. header
 
@@ -135,89 +99,101 @@ peg::parser! {
 
         // §1. statement
 
-        rule preamble() -> Cst =
-            s:p() DUMMY() e:p()
-        { cst!((s, e)) }
+        pub rule preamble() -> Cst =
+            s:p() stmts:statement()+ e:p()
+        { cst!((s, e) [stmts]) }
 
+        #[cache]
         rule statement() -> Cst =
-            s:p() DUMMY() e:p()
-        { cst!((s, e)) }
+            let_stmt()
+            / let_rec_stmt()
+            / let_inline_stmt()
+            / let_block_stmt()
+            / let_math_stmt()
+            / let_mutable_stmt()
+            / type_stmt()
+            / module_stmt()
+            / open_stmt()
 
         rule let_stmt() -> Cst =
-            s:p() DUMMY() e:p()
-        { cst!((s, e)) }
+            s:p() "let" _ pat:pattern() _ arg:let_stmt_argument()? _ "=" _ expr:expr() e:p()
+        { cst!((s, e) [pat, arg, expr]) }
 
         rule let_stmt_argument() -> Cst =
-            s:p() DUMMY() e:p()
-        { cst!((s, e)) }
+            // TODO: type_expr は本当は txfunc
+            s:p() ":" _ t:type_expr() _ "|" _ a:arg()+ e:p() { cst!((s, e) [t, a]) }
+            / s:p() ":" _ t:type_expr() e:p() { cst!((s, e) [t]) }
+            / s:p() "|" _ a:arg()+ e:p() { cst!((s, e) [a]) }
 
         rule let_rec_stmt() -> Cst =
-            s:p() DUMMY() e:p()
-        { cst!((s, e)) }
+            s:p() "let-rec" _ inner:let_rec_inner() _ inners:(let_rec_inner() ** (_ "and" _)) e:p()
+        { cst!((s, e) [inner, inners]) }
 
         rule let_rec_inner() -> Cst =
-            s:p() DUMMY() e:p()
-        { cst!((s, e)) }
+            s:p()
+            pat:pattern() _ arg:let_rec_stmt_argument()? _ "=" _ expr:expr()
+            _ arms:("|" _ arm:let_rec_matcharm() _ {arm})*
+            e:p()
+        { cst!((s, e) [pat, arg, expr, arms]) }
 
         rule let_rec_stmt_argument() -> Cst =
-            s:p() DUMMY() e:p()
-        { cst!((s, e)) }
+            s:p() ":" _ t:type_expr() _ "|" _ a:arg()+ e:p() { cst!((s, e) [t, a]) }
+            / s:p() ":" _ t:type_expr() e:p() { cst!((s, e) [t]) }
+            / s:p() a:arg()+ e:p() { cst!((s, e) [a]) }
 
         rule let_rec_matcharm() -> Cst =
-            s:p() DUMMY() e:p()
-        { cst!((s, e)) }
+            s:p() a:arg()* _ "=" _ expr:expr() e:p()
+        { cst!((s, e) [a, expr]) }
 
-        rule let_inline_stmt() -> Cst =
-            s:p() DUMMY() e:p()
-        { cst!((s, e)) }
-
+        rule let_inline_stmt() -> Cst = let_inline_stmt_ctx() / let_inline_stmt_noctx()
         rule let_inline_stmt_ctx() -> Cst =
-            s:p() DUMMY() e:p()
-        { cst!((s, e)) }
-
+            s:p() "let-inline" _ ctx:var() _ cmd:inline_cmd_name() _ a:arg()* _ "=" _ expr:expr() e:p()
+        { cst!((s, e) [ctx, cmd, a, expr]) }
         rule let_inline_stmt_noctx() -> Cst =
-            s:p() DUMMY() e:p()
-        { cst!((s, e)) }
+            s:p() "let-inline" _ cmd:inline_cmd_name() _ pat:pattern()* _ "=" _ expr:expr() e:p()
+        { cst!((s, e) [cmd, pat, expr]) }
 
-        rule let_block_stmt() -> Cst =
-            s:p() DUMMY() e:p()
-        { cst!((s, e)) }
-
+        rule let_block_stmt() -> Cst = let_block_stmt_ctx() / let_block_stmt_noctx()
         rule let_block_stmt_ctx() -> Cst =
-            s:p() DUMMY() e:p()
-        { cst!((s, e)) }
-
+            s:p() "let-block" _ ctx:var() _ cmd:block_cmd_name() _ a:arg()* _ "=" _ expr:expr() e:p()
+        { cst!((s, e) [ctx, cmd, a, expr]) }
         rule let_block_stmt_noctx() -> Cst =
-            s:p() DUMMY() e:p()
-        { cst!((s, e)) }
+            s:p() "let-block" _ cmd:block_cmd_name() _ pat:pattern()* _ "=" _ expr:expr() e:p()
+        { cst!((s, e) [cmd, pat, expr]) }
 
         rule let_math_stmt() -> Cst =
-            s:p() DUMMY() e:p()
-        { cst!((s, e)) }
+            s:p() "let-math" _ cmd:math_cmd_name() _ pat:pattern()* _ "=" _ expr:expr() e:p()
+        { cst!((s, e) [cmd, pat, expr]) }
 
         rule let_mutable_stmt() -> Cst =
-            s:p() DUMMY() e:p()
-        { cst!((s, e)) }
+            s:p() "let-mutable" _ var:var() _ "<-" _ expr:expr() e:p()
+        { cst!((s, e) [var, expr]) }
 
         rule type_stmt() -> Cst =
-            s:p() DUMMY() e:p()
-        { cst!((s, e)) }
+            s:p() "type" _ t:type_inner() _ ts:(type_inner() ** (_ "and" _)) e:p()
+        { cst!((s, e) [t, ts]) }
 
         rule type_inner() -> Cst =
-            s:p() DUMMY() e:p()
-        { cst!((s, e)) }
+            s:p()
+            tp:type_param()* _ t:type_name() _ "=" tvs:(type_variant() **  (_ "|" _)) _ c:constraint()*
+            e:p()
+            { cst!((s, e) [tp, t, tvs, c]) }
+            / s:p() tp:type_param()* _ t:type_name() _ "=" _ tvs:("|" _ tv:type_variant() {tv})+ _ c:constraint()* e:p()
+            { cst!((s, e) [tp, t, tvs, c]) }
+            / s:p() tp:type_param()* _ tn:type_name() _ "=" _ te:type_expr() _ c:constraint()* e:p()
+            { cst!((s, e) [tp, tn, te, c]) }
 
-        rule type_varaiant() -> Cst =
-            s:p() DUMMY() e:p()
-        { cst!((s, e)) }
+        rule type_variant() -> Cst =
+            s:p() v:variant_name() _ "of" _ t:type_expr() e:p() { cst!((s, e) [v, t]) }
+            / s:p() v:variant_name() e:p() { cst!((s, e) [v]) }
 
         rule open_stmt() -> Cst =
-            s:p() DUMMY() e:p()
-        { cst!((s, e)) }
+            s:p() "open" _ m:module_name() e:p()
+        { cst!((s, e) [m]) }
 
         rule arg() -> Cst =
-            s:p() DUMMY() e:p()
-        { cst!((s, e)) }
+            s:p() p:pattern() e:p() { cst!((s, e) [p]) }
+            / s:p() "?:" _ p:var_ptn() e:p() { cst!((s, e) [p]) }
 
         // §1. module
 
@@ -258,7 +234,7 @@ peg::parser! {
             typeprod:type_prod()
             e:p()
         {
-            cst!(type_expr (s, e); vectorize![typeopts, typeprods, typeprod])
+            cst!(type_expr (s, e) [typeopts, typeprods, typeprod])
         }
 
         pub rule type_optional() -> Cst = s:p() t:type_prod() e:p() { cst!(type_optional (s, e); t.inner) }
@@ -266,7 +242,7 @@ peg::parser! {
         pub rule type_prod() -> Cst =
             s:p() t:type_unary() ts:(_ "*" _ t:type_unary() {t})* e:p()
         {
-            cst!(type_prod (s, e); vectorize![t, ts])
+            cst!(type_prod (s, e) [t, ts])
         }
 
         #[cache]
@@ -284,7 +260,7 @@ peg::parser! {
             / s:p() "[" _ t:type_list_unit()
                 ts:(_ ";" _ t:type_list_unit() {t})* _
                 ";"? _ "]" e:p()
-                { cst!(type_list (s, e); vectorize![t, ts]) }
+                { cst!(type_list (s, e) [t, ts]) }
 
         rule type_list_unit() -> Cst =
             t:type_list_unit_optional() _ "?" {t}
@@ -296,7 +272,7 @@ peg::parser! {
 
         pub rule type_application() -> Cst =
             s:p() t:type_application_unit() _ ts:(type_application_unit()** _) e:p()
-        { cst!(type_application (s, e); vectorize![t, ts]) }
+        { cst!(type_application (s, e) [t, ts]) }
 
         rule type_application_unit() -> Cst =
             "(" _ t:type_expr() _ ")" {t}
@@ -329,25 +305,32 @@ peg::parser! {
 
         // §1. pattern
 
+        #[cache]
         rule match_ptn() -> Cst =
-            s:p() DUMMY() e:p()
-        { cst!((s, e)) }
+            s:p() p:pattern() _ "as" _ v:var() e:p() { cst!((s, e) [p, v]) }
+            / s:p() p:pattern() _ "::" _ m:match_ptn() e:p() { cst!((s, e) [p, m]) }
+            / s:p() p:pat_variant() e:p() { cst!((s, e) [p]) }
+            / s:p() p:pattern() e:p() { cst!((s, e) [p]) }
 
+        #[cache]
         rule pattern() -> Cst =
-            s:p() DUMMY() e:p()
-        { cst!((s, e)) }
+            s:p() p:pat_list() e:p() { cst!((s, e) [p]) }
+            / s:p() "(" _ p:match_ptn() _ ")" e:p() { cst!((s, e) [p]) }
+            / s:p() p:pat_tuple() e:p() { cst!((s, e) [p]) }
+            / s:p() "_" e:p() { cst!((s, e)) }
+            / s:p() v:var() e:p() { cst!((s, e) [v]) }
+            / s:p() l:constant() e:p() { cst!((s, e) [l]) }
 
         rule pat_variant() -> Cst =
-            s:p() DUMMY() e:p()
-        { cst!((s, e)) }
+            s:p() v:variant_name() _ p:pattern()? e:p()
+        { cst!((s, e) [v, p]) }
 
         rule pat_list() -> Cst =
-            s:p() DUMMY() e:p()
-        { cst!((s, e)) }
+            s:p() "[" _ "]" e:p() { cst!((s, e)) }
+            / s:p() "[" ms:(match_ptn() ** (_ ";" _)) _ ";"? _ "]" e:p() { cst!((s, e) [ms]) }
 
         rule pat_tuple() -> Cst =
-            s:p() DUMMY() e:p()
-        { cst!((s, e)) }
+            s:p() "(" ms:(match_ptn() ** (_ "," _)) _ ";"? _ ")" e:p() { cst!((s, e) [ms]) }
 
         // §1. expr
         rule expr() -> Cst =
@@ -476,6 +459,7 @@ peg::parser! {
             / "and" / "end" / "fun" / "let" / "mod" / "not" / "sig" / "val"
             / "as" / "do" / "if" / "in" / "of")
 
+
         pub rule modvar() -> Cst =
             s:p() modname:module_name() _ "." _ var:var_ptn() e:p()
         { cst!(modvar (s, e) [modname, var]) }
@@ -483,6 +467,10 @@ peg::parser! {
         pub rule module_name() -> Cst =
             s:p() DUMMY() e:p()
         { cst!(module_name (s, e)) }
+
+        pub rule variant_name() -> Cst =
+            s:p() DUMMY() e:p()
+        { cst!((s, e)) }
 
         // §1. constants
         pub rule constant() -> Cst =
@@ -627,9 +615,77 @@ peg::parser! {
             s:p() DUMMY() e:p()
         { cst!((s, e)) }
 
+        rule vertical_element() -> Cst =
+            s:p() DUMMY() e:p()
+        { cst!((s, e)) }
+
+        rule block_cmd_name() -> Cst =
+            s:p() DUMMY() e:p()
+        { cst!((s, e)) }
+
+        rule block_cmd() -> Cst =
+            s:p() DUMMY() e:p()
+        { cst!((s, e)) }
+
+        rule block_text_embedding() -> Cst =
+            s:p() DUMMY() e:p()
+        { cst!((s, e)) }
+
         // §1. math mode
 
         rule math() -> Cst =
+            s:p() DUMMY() e:p()
+        { cst!((s, e)) }
+
+        rule math_list() -> Cst =
+            s:p() DUMMY() e:p()
+        { cst!((s, e)) }
+
+        rule math_single() -> Cst =
+            s:p() DUMMY() e:p()
+        { cst!((s, e)) }
+
+        rule math_token() -> Cst =
+            s:p() DUMMY() e:p()
+        { cst!((s, e)) }
+
+        rule math_group() -> Cst =
+            s:p() DUMMY() e:p()
+        { cst!((s, e)) }
+
+        rule math_unary() -> Cst =
+            s:p() DUMMY() e:p()
+        { cst!((s, e)) }
+
+        rule math_cmd() -> Cst =
+            s:p() DUMMY() e:p()
+        { cst!((s, e)) }
+
+        rule math_special_char() -> Cst =
+            s:p() DUMMY() e:p()
+        { cst!((s, e)) }
+
+        rule math_symbol() -> Cst =
+            s:p() DUMMY() e:p()
+        { cst!((s, e)) }
+
+        rule math_cmd_name() -> Cst =
+            s:p() DUMMY() e:p()
+        { cst!((s, e)) }
+
+        rule math_cmd_expr_arg() -> Cst =
+            s:p() DUMMY() e:p()
+        { cst!((s, e)) }
+
+        rule math_cmd_list_arg() -> Cst =
+            s:p() DUMMY() e:p()
+        { cst!((s, e)) }
+
+        rule math_cmd_record_arg() -> Cst =
+            s:p() DUMMY() e:p()
+        { cst!((s, e)) }
+
+        rule math_cmd_expr_option() -> Cst =
             s:p() DUMMY() e:p()
         { cst!((s, e)) }
 
