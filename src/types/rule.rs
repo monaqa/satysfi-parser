@@ -60,6 +60,9 @@ make_rule! {
     regular_text,
     inline_text_embedding,
 
+    vertical,
+    block_text_embedding,
+
     // constants
     constant,
     const_unit,
@@ -72,6 +75,8 @@ make_rule! {
     // command
     inline_cmd,
     inline_cmd_name,
+    block_cmd,
+    block_cmd_name,
 
     // expr
     module_name,
