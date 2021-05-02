@@ -10,6 +10,7 @@ mod commands;
 mod constant;
 mod header;
 mod horizontal;
+mod math;
 mod statement;
 mod term;
 mod types;
@@ -109,7 +110,7 @@ pub enum CstParseError {
         branch: CstBranchSequence,
     },
     /// rule が合わない
-    #[error("Text does not match at {}.\n  written in test: {:?}\n  actually parsed: {:?}", .branch, .expect, .actual)]
+    #[error("Rule does not match at {}.\n  written in test: {:?}\n  actually parsed: {:?}", .branch, .expect, .actual)]
     RuleDoesNotMatch {
         actual: Rule,
         expect: Rule,

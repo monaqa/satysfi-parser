@@ -77,10 +77,19 @@ make_rule! {
     inline_cmd_name,
     block_cmd,
     block_cmd_name,
+    math_cmd,
 
     // expr
     module_name,
     modvar,
     var,
     var_ptn,
+
+    // math
+    math_single,
+    math_list,
+    math_token,
+    math_sup,
+    math_sub,
+    math_unary,
 }

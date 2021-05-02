@@ -22,9 +22,10 @@ peg::parser! {
 
         /// WHITESPACE
         rule _() = ([' ' | '\t' | '\n' | '\r'] / comment())*
-        rule __() = [' ' | '\t' | '\n' | '\r']*
+
         /// alias for position
         rule p() -> usize = pos:position!() {pos}
+
         /// dummy pattern (never match)
         rule DUMMY() = !"DUMMY" "DUMMY"
         /// end of file
@@ -50,7 +51,7 @@ peg::parser! {
 
         // §1. program
 
-        pub rule program() -> Cst = program_saty() / program_satyh()
+        pub rule program() -> Cst = p:(program_saty() / program_satyh()) EOF() {p}
 
         pub rule program_saty() -> Cst =
             s:p() _
@@ -612,9 +613,9 @@ peg::parser! {
             "<" _ inner:vertical() _ ">" {inner}
             / "{" _ inner:horizontal() _ "}" {inner}
 
-        rule math_cmd() -> Cst =
+        pub rule math_cmd() -> Cst =
             s:p() cmd:math_cmd_name() _ args:((math_cmd_expr_arg() / math_cmd_expr_option()) ** _) e:p()
-        { cst!((s, e) [cmd, args]) }
+        { cst!(math_cmd (s, e) [cmd, args]) }
 
         rule math_cmd_name() -> Cst =
             s:p() r"\" inner:(modvar() / var_ptn()) e:p()
@@ -709,37 +710,30 @@ peg::parser! {
 
         rule math() -> Cst = math_list() / math_single()
 
-        rule math_list() -> Cst =
-            s:p() "|" _ ms:(math_single() ** (_ "|" _)) _ "|" e:p()
-        { cst!((s, e) [ms]) }
+        pub rule math_list() -> Cst =
+            s:p() "|" ms:(_ m:math_single() _ "|" {m})+ e:p() { cst!(math_list (s, e) [ms]) }
 
-        rule math_single() -> Cst =
+        pub rule math_single() -> Cst =
             s:p() ts:(math_token() ** _) e:p()
-        { cst!((s, e) [ts]) }
+        { cst!(math_single (s, e) [ts]) }
 
-        rule math_token() -> Cst = math_supsub() / math_subsup() / math_sup() / math_sub() / math_unary()
+        pub rule math_token() -> Cst =
+            s:p() u:math_unary() _ sup:math_sup() _ sub:math_sub() e:p() { cst!(math_token (s, e) [u, sup, sub]) }
+            / s:p() u:math_unary() _ sub:math_sub() _ sup:math_sup() e:p() { cst!(math_token (s, e) [u, sub, sup]) }
+            / s:p() u:math_unary() _ sup:math_sup() e:p() { cst!(math_token (s, e) [u, sup]) }
+            / s:p() u:math_unary() _ sub:math_sub() e:p() { cst!(math_token (s, e) [u, sub]) }
+            / s:p() u:math_unary() e:p() { cst!(math_token (s, e) [u]) }
 
-        pub rule math_supsub() -> Cst =
-            s:p() u:math_unary() _ "^" _ sup:math_group() _ "_" _ sub:math_group() e:p()
-            { cst!((s, e) [u, sup, sub]) }
-        pub rule math_subsup() -> Cst =
-            s:p() u:math_unary() _ "_" _ sub:math_group() _ "^" _ sup:math_group() e:p()
-            { cst!((s, e) [u, sub, sup]) }
-        pub rule math_sup() -> Cst =
-            s:p() u:math_unary() _ "^" _ sup:math_group() e:p()
-            { cst!((s, e) [u, sup]) }
-        pub rule math_sub() -> Cst =
-            s:p() u:math_unary() _ "_" _ sub:math_group() e:p()
-            { cst!((s, e) [u, sub]) }
-
+        pub rule math_sup() -> Cst = "^" s:p() _ g:math_group() e:p() { cst!(math_sup (s, e) [g]) }
+        pub rule math_sub() -> Cst = "_" s:p() _ g:math_group() e:p() { cst!(math_sub (s, e) [g]) }
         rule math_group() -> Cst = "{" _ m:math_single() _ "}" {m} / math_unary()
 
-        rule math_unary() -> Cst =
+        pub rule math_unary() -> Cst =
             // TODO: allow unicode characters
-            s:p() ['A'..='z' | '0'..='9'] e:p() { cst!((s, e)) }
-            / s:p() "\\" math_special_char() e:p() { cst!((s, e)) }
-            / s:p() math_symbol() e:p() { cst!((s, e)) }
-            / s:p() m:math_cmd() e:p() { cst!((s, e) [m]) }
+            s:p() ['A'..='Z' | 'a'..='z' | '0'..='9'] e:p() { cst!(math_unary (s, e)) }
+            / s:p() r"\" math_special_char() e:p() { cst!(math_unary (s, e)) }
+            / s:p() math_symbol() e:p() { cst!(math_unary (s, e)) }
+            / s:p() m:math_cmd() e:p() { cst!(math_unary (s, e) [m]) }
 
         rule math_special_char() = [
             ' ' | '!' | '"' | '#' | '$' | '%' | '&' | '\''
