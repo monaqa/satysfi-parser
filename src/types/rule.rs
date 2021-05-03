@@ -70,7 +70,8 @@ make_rule! {
     constraint,
 
     // pattern
-    match_ptn,
+    pat_as,
+    pat_cons,
     pattern,
     pat_variant,
     pat_list,

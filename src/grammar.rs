@@ -317,17 +317,19 @@ peg::parser! {
 
         // §1. pattern
 
+        pub rule pat_as() -> Cst =
+            s:p() p:pat_cons() v:(_ kwd("as") _ v:var() {v})? e:p() { cst!(pat_as (s, e) [p, v]) }
+
         #[cache]
-        pub rule match_ptn() -> Cst =
-            s:p() p:pattern() _ kwd("as") _ v:var() e:p() { cst!(match_ptn (s, e) [p, v]) }
-            / s:p() p:pattern() _ "::" _ m:match_ptn() e:p() { cst!(match_ptn (s, e) [p, m]) }
-            / s:p() p:pat_variant() e:p() { cst!(match_ptn (s, e) [p]) }
-            / s:p() p:pattern() e:p() { cst!(match_ptn (s, e) [p]) }
+        pub rule pat_cons() -> Cst =
+            s:p() p:pattern() _ "::" _ m:pat_as() e:p() { cst!(pat_cons (s, e) [p, m]) }
+            / s:p() p:pat_variant() e:p() { cst!(pat_cons (s, e) [p]) }
+            / s:p() p:pattern() e:p() { cst!(pat_cons (s, e) [p]) }
 
         #[cache]
         pub rule pattern() -> Cst =
             s:p() p:pat_list() e:p() { cst!(pattern (s, e) [p]) }
-            / s:p() "(" _ p:match_ptn() _ ")" e:p() { cst!(pattern (s, e) [p]) }
+            / s:p() "(" _ p:pat_as() _ ")" e:p() { cst!(pattern (s, e) [p]) }
             / s:p() p:pat_tuple() e:p() { cst!(pattern (s, e) [p]) }
             / s:p() "_" e:p() { cst!(pattern (s, e)) }
             / s:p() v:var() e:p() { cst!(pattern (s, e) [v]) }
@@ -339,10 +341,11 @@ peg::parser! {
 
         pub rule pat_list() -> Cst =
             s:p() "[" _ "]" e:p() { cst!(pat_list (s, e)) }
-            / s:p() "[" ms:(match_ptn() ** (_ ";" _)) _ ";"? _ "]" e:p() { cst!(pat_list (s, e) [ms]) }
+            / s:p() "[" _ ms:(pat_as() ** (_ ";" _)) _ ";"? _ "]" e:p() { cst!(pat_list (s, e) [ms]) }
 
         pub rule pat_tuple() -> Cst =
-            s:p() "(" ms:(match_ptn() ** (_ "," _)) _ ";"? _ ")" e:p() { cst!(pat_tuple (s, e) [ms]) }
+            s:p() "(" _ m:pat_as() _ "," _ ms:(pat_as() ++ (_ "," _)) _ ")" e:p()
+            { cst!(pat_tuple (s, e) [m, ms]) }
 
         // §1. expr
         pub rule expr() -> Cst =
@@ -374,7 +377,7 @@ peg::parser! {
 
         pub rule match_arm() -> Cst =
             s:p()
-            ptn:match_ptn() _ guard:match_guard()? _ "->" _ expr:(!match_expr() e:expr() {e})
+            ptn:pat_as() _ guard:match_guard()? _ "->" _ expr:(!match_expr() e:expr() {e})
             e:p()
             { cst!(match_arm (s, e) [ptn, guard, expr]) }
 

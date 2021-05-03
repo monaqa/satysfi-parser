@@ -12,6 +12,7 @@ mod expr;
 mod header;
 mod horizontal;
 mod math;
+mod pattern;
 mod statement;
 mod term;
 mod types;

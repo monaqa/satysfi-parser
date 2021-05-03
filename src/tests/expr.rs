@@ -175,9 +175,9 @@ fn bind_stmt() {
 
 #[test]
 fn match_arm() {
-    assert_parsed!("Some(x) -> x" match_arm: ["Some(x)" match_ptn: [_]; "x" expr: [_]; ]);
+    assert_parsed!("Some(x) -> x" match_arm: ["Some(x)" pat_as: [_]; "x" expr: [_]; ]);
     assert_parsed!("Some(x) when x < 5 -> x" match_arm: [
-        "Some(x)" match_ptn: [_];
+        "Some(x)" pat_as: [_];
         "when x < 5" match_guard: [_];
         "x" expr: [_];
     ]);
