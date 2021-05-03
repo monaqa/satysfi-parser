@@ -345,18 +345,21 @@ peg::parser! {
 
         // §1. expr
         pub rule expr() -> Cst =
-            match_expr()
-            / ctrl_while()
-            / ctrl_if()
-            / lambda()
-            / assignment()
-            / dyadic_expr()
-            / unary_operator_expr()
-            / variant_constructor()
-            / application()
-            / command_application()
-            / record_member()
-            / unary()
+            s:p() expr:(
+                match_expr()
+                / ctrl_while()
+                / ctrl_if()
+                / lambda()
+                / assignment()
+                / dyadic_expr()
+                / unary_operator_expr()
+                / variant_constructor()
+                / application()
+                / command_application()
+                / record_member()
+                / unary()
+            ) e:p()
+        { cst!(expr (s, e) [expr]) }
 
         rule match_expr() -> Cst =
             s:p() "match" _ expr:expr() _ "with" _ "|"? arms:(match_arm() ** (_ "|" _)) e:p()
@@ -432,7 +435,7 @@ peg::parser! {
         // §1. unary
 
         #[cache]
-        rule unary() -> Cst =
+        pub rule unary() -> Cst =
             s:p() body:(
                 block_text()
                 / horizontal_text()
@@ -447,22 +450,22 @@ peg::parser! {
                 / modvar()
                 / var()
             ) e:p()
-        { cst!((s, e) [body]) }
+        { cst!(unary (s, e) [body]) }
 
-        rule block_text() -> Cst =
+        pub rule block_text() -> Cst =
             s:p() "'<" _ v:vertical() _ ">" e:p()
-        { cst!((s, e) [v]) }
+        { cst!(block_text (s, e) [v]) }
 
-        rule horizontal_text() -> Cst =
+        pub rule horizontal_text() -> Cst =
             s:p() "{" _ h:horizontal() _ "}" e:p()
-        { cst!((s, e) [h]) }
+        { cst!(horizontal_text (s, e) [h]) }
 
         pub rule math_text() -> Cst =
             s:p() "${" _ m:math() _ "}" e:p()
         { cst!(math_text (s, e) [m]) }
 
         pub rule record() -> Cst =
-            s:p() "(" _ "|" _ "|" _ ")" e:p() { cst!(record (s, e)) }
+            s:p() "(|" _ "|)" e:p() { cst!(record (s, e)) }
             / s:p() "(" _ "|" _ u:unary() _ "with" _ i:record_inner() _ "|" _ ")" e:p() { cst!(record (s, e) [u, i]) }
             / s:p() "(" _ "|" _ i:record_inner() _ "|" _ ")" e:p() { cst!(record (s, e) [i]) }
 
@@ -476,22 +479,23 @@ peg::parser! {
 
         pub rule list() -> Cst =
             s:p() "[" _ "]" e:p() { cst!(list (s, e)) }
-            / s:p() "[" exprs:(expr() ++ (_ ";" _)) _ ";"? "]" e:p() { cst!(list (s, e) [exprs]) }
+            / s:p() "[" _ exprs:(expr() ++ (_ ";" _)) _ ";"? _ "]" e:p() { cst!(list (s, e) [exprs]) }
 
         pub rule tuple() -> Cst =
-            s:p() "(" exprs:(expr() ++ (_ "," _)) _ ";"? ")" e:p() { cst!(tuple (s, e) [exprs]) }
+            s:p() "(" _ expr:expr() _ "," _ exprs:(expr() ++ (_ "," _)) _ ")" e:p() { cst!(tuple (s, e) [expr, exprs]) }
 
-        rule bin_operator() -> Cst =
-            s:p() (bin_operator_start() bin_operator_succ() / "::" / "mod") e:p()
-        { cst!((s, e)) }
+        pub rule bin_operator() -> Cst =
+            s:p() (bin_operator_start() bin_operator_succ()* / "::" / "mod") e:p()
+        { cst!(bin_operator (s, e)) }
         rule bin_operator_start() =
             [ '-' | '+' | '*' | '/' | '^' | '&' | '|' | '=' | '<' | '>' ]
         rule bin_operator_succ() =
-            [ '-' | '+' | '*' | '/' | '^' | '&' | '|' | '=' | '<' | '>' | '!' | ':' | '~' | '\'' | '.' | '?' ]
+            [ '-' | '+' | '*' | '/' | '^' | '&' | '|' | '=' | '<' | '>'
+                  | '!' | ':' | '~' | '\'' | '.' | '?' ]
 
-        rule expr_with_mod() -> Cst =
+        pub rule expr_with_mod() -> Cst =
             s:p() m:module_name() ".(" _ expr:expr() _ ")" e:p()
-        { cst!((s, e) [m, expr]) }
+        { cst!(expr_with_mod (s, e) [m, expr]) }
 
         pub rule var() -> Cst =
             s:p() !(reserved_word() !ASCII_ALPHANUMERIC_HYPHEN()) var_ptn() e:p()
@@ -527,7 +531,7 @@ peg::parser! {
 
         pub rule variant_name() -> Cst =
             s:p() ['A' ..= 'Z'] ASCII_ALPHANUMERIC_HYPHEN()* e:p()
-        { cst!((s, e)) }
+        { cst!(variant_name (s, e)) }
 
         // §1. constants
         pub rule constant() -> Cst =
@@ -688,9 +692,9 @@ peg::parser! {
             ['@' | '`' | '\\' | '{' | '}' | '%' | '|' | '*' | '$' | '#' | ';']
 
         pub rule horizontal_list() -> Cst =
-            s:p() "|" inners:horizontal_list_inner()+ e:p()
+            s:p() _ "|" inners:horizontal_list_inner()+ e:p()
             { cst!(horizontal_list (s, e) [inners]) }
-        rule horizontal_list_inner() -> Cst = _ inner:horizontal_single() _ "|" {inner}
+        rule horizontal_list_inner() -> Cst = inner:horizontal_single() "|" {inner}
 
         pub rule horizontal_bullet_list() -> Cst =
             inners:horizontal_bullet()+ { cst!(horizontal_bullet_list; inners) }

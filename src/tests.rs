@@ -14,6 +14,7 @@ mod math;
 mod statement;
 mod term;
 mod types;
+mod unary;
 mod vertical;
 
 use itertools::Itertools;

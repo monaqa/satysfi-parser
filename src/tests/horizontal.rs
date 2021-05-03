@@ -32,7 +32,16 @@ fn horizontal_list() {
     assert_parsed!("|aaa|" horizontal_list: [ "aaa" horizontal_single, regular_text: []; ]);
     assert_parsed!("|aaa| bbb |" horizontal_list: [
         "aaa" horizontal_single, regular_text: [];
-        "bbb " horizontal_single, regular_text: [];
+        " bbb " horizontal_single, regular_text: [];
+    ]);
+    assert_parsed!("\n|   aaa| bbb |" horizontal_list: [
+        "   aaa" horizontal_single, regular_text: [];
+        " bbb " horizontal_single, regular_text: [];
+    ]);
+    assert_parsed!(" ||   aaa| bbb |" horizontal_list: [
+        "" horizontal_single: [];
+        "   aaa" horizontal_single, regular_text: [];
+        " bbb " horizontal_single, regular_text: [];
     ]);
 }
 

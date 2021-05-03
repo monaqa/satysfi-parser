@@ -53,13 +53,24 @@ make_rule! {
 
     // expr
     expr,
-    math_text,
 
     // unary
+    unary,
+    block_text,
+    horizontal_text,
+    math_text,
     list,
     record,
     record_unit,
     tuple,
+    bin_operator,
+    expr_with_mod,
+    var,
+    var_ptn,
+    modvar,
+    mod_cmd_name,
+    module_name,
+    variant_name,
 
     // command
     cmd_name_ptn,
@@ -96,13 +107,6 @@ make_rule! {
     const_float,
     const_length,
     const_string,
-
-    // expr
-    module_name,
-    modvar,
-    mod_cmd_name,
-    var,
-    var_ptn,
 
     // math
     math_single,
