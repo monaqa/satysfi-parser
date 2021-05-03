@@ -18,6 +18,7 @@ macro_rules! vectorize {
 
 peg::parser! {
     pub grammar satysfi_parser() for str {
+        use peg::ParseLiteral;
         // §1. common
 
         /// WHITESPACE
@@ -41,7 +42,7 @@ peg::parser! {
         /// keywords
         /// 例えば kwd("let") とすると、
         /// "let" にはマッチするが "leti" や "let-inline" にはマッチしなくなる。
-        rule kwd(word: &str) = ({word}) !ASCII_ALPHANUMERIC_HYPHEN()
+        rule kwd(word: &'static str) = ##parse_string_literal(word) !ASCII_ALPHANUMERIC_HYPHEN()
 
         pub rule misc() -> Cst = DUMMY() { cst!((0, 0)) }
 
@@ -57,7 +58,7 @@ peg::parser! {
             s:p() _
             stage:header_stage()? _
             headers:headers() _
-            pre:(pre:preamble() _ "in" {pre})? _
+            pre:(pre:preamble() _ kwd("in") {pre})? _
             expr:expr() _
             e:p()
         { cst!(program_saty (s, e) [stage, headers, pre, expr]) }
@@ -116,113 +117,113 @@ peg::parser! {
             / module_stmt()
             / open_stmt()
 
-        rule let_stmt() -> Cst =
-            s:p() "let" _ pat:pattern() _ arg:let_stmt_argument()? _ "=" _ expr:expr() e:p()
-        { cst!((s, e) [pat, arg, expr]) }
+        pub rule let_stmt() -> Cst =
+            s:p() kwd("let") _ pat:pattern() _ arg:let_stmt_argument()? _ "=" _ expr:expr() e:p()
+        { cst!(let_stmt (s, e) [pat, arg, expr]) }
 
-        rule let_stmt_argument() -> Cst =
+        rule let_stmt_argument() -> Vec<Cst> =
             // TODO: type_expr は本当は txfunc
-            s:p() ":" _ t:type_expr() _ "|" _ a:arg()+ e:p() { cst!((s, e) [t, a]) }
-            / s:p() ":" _ t:type_expr() e:p() { cst!((s, e) [t]) }
-            / s:p() "|" _ a:arg()+ e:p() { cst!((s, e) [a]) }
+            s:p() ":" _ t:type_expr() _ "|" _ a:arg()+ e:p() { vectorize![t, a] }
+            / s:p() ":" _ t:type_expr() e:p() { vectorize![t] }
+            / s:p() "|" _ a:arg()+ e:p() { vectorize![a] }
 
-        rule let_rec_stmt() -> Cst =
-            s:p() "let-rec" _ inner:let_rec_inner() _ inners:(let_rec_inner() ** (_ "and" _)) e:p()
+        pub rule let_rec_stmt() -> Cst =
+            s:p() kwd("let-rec") _ inner:let_rec_inner() _ inners:(let_rec_inner() ** (_ kwd("and") _)) e:p()
         { cst!((s, e) [inner, inners]) }
 
-        rule let_rec_inner() -> Cst =
+        pub rule let_rec_inner() -> Cst =
             s:p()
             pat:pattern() _ arg:let_rec_stmt_argument()? _ "=" _ expr:expr()
             _ arms:("|" _ arm:let_rec_matcharm() _ {arm})*
             e:p()
-        { cst!((s, e) [pat, arg, expr, arms]) }
+        { cst!(let_rec_inner (s, e) [pat, arg, expr, arms]) }
 
-        rule let_rec_stmt_argument() -> Cst =
-            s:p() ":" _ t:type_expr() _ "|" _ a:arg()+ e:p() { cst!((s, e) [t, a]) }
-            / s:p() ":" _ t:type_expr() e:p() { cst!((s, e) [t]) }
-            / s:p() a:arg()+ e:p() { cst!((s, e) [a]) }
+        rule let_rec_stmt_argument() -> Vec<Cst> =
+            s:p() ":" _ t:type_expr() _ "|" _ a:arg()+ e:p() { vectorize![t, a] }
+            / s:p() ":" _ t:type_expr() e:p() { vectorize![t] }
+            / s:p() a:arg()+ e:p() { vectorize![a] }
 
-        rule let_rec_matcharm() -> Cst =
+        pub rule let_rec_matcharm() -> Cst =
             s:p() a:arg()* _ "=" _ expr:expr() e:p()
-        { cst!((s, e) [a, expr]) }
+        { cst!(let_rec_matcharm (s, e) [a, expr]) }
 
         rule let_inline_stmt() -> Cst = let_inline_stmt_ctx() / let_inline_stmt_noctx()
-        rule let_inline_stmt_ctx() -> Cst =
-            s:p() "let-inline" _ ctx:var() _ cmd:inline_cmd_name() _ a:arg()* _ "=" _ expr:expr() e:p()
-        { cst!((s, e) [ctx, cmd, a, expr]) }
-        rule let_inline_stmt_noctx() -> Cst =
-            s:p() "let-inline" _ cmd:inline_cmd_name() _ pat:pattern()* _ "=" _ expr:expr() e:p()
-        { cst!((s, e) [cmd, pat, expr]) }
+        pub rule let_inline_stmt_ctx() -> Cst =
+            s:p() kwd("let-inline") _ ctx:var() _ cmd:inline_cmd_name() _ a:arg()* _ "=" _ expr:expr() e:p()
+        { cst!(let_inline_stmt_ctx (s, e) [ctx, cmd, a, expr]) }
+        pub rule let_inline_stmt_noctx() -> Cst =
+            s:p() kwd("let-inline") _ cmd:inline_cmd_name() _ pat:pattern()* _ "=" _ expr:expr() e:p()
+        { cst!(let_inline_stmt_noctx (s, e) [cmd, pat, expr]) }
 
         rule let_block_stmt() -> Cst = let_block_stmt_ctx() / let_block_stmt_noctx()
-        rule let_block_stmt_ctx() -> Cst =
-            s:p() "let-block" _ ctx:var() _ cmd:block_cmd_name() _ a:arg()* _ "=" _ expr:expr() e:p()
-        { cst!((s, e) [ctx, cmd, a, expr]) }
-        rule let_block_stmt_noctx() -> Cst =
-            s:p() "let-block" _ cmd:block_cmd_name() _ pat:pattern()* _ "=" _ expr:expr() e:p()
-        { cst!((s, e) [cmd, pat, expr]) }
+        pub rule let_block_stmt_ctx() -> Cst =
+            s:p() kwd("let-block") _ ctx:var() _ cmd:block_cmd_name() _ a:arg()* _ "=" _ expr:expr() e:p()
+        { cst!(let_block_stmt_ctx (s, e) [ctx, cmd, a, expr]) }
+        pub rule let_block_stmt_noctx() -> Cst =
+            s:p() kwd("let-block") _ cmd:block_cmd_name() _ pat:pattern()* _ "=" _ expr:expr() e:p()
+        { cst!(let_block_stmt_noctx (s, e) [cmd, pat, expr]) }
 
-        rule let_math_stmt() -> Cst =
-            s:p() "let-math" _ cmd:math_cmd_name() _ pat:pattern()* _ "=" _ expr:expr() e:p()
-        { cst!((s, e) [cmd, pat, expr]) }
+        pub rule let_math_stmt() -> Cst =
+            s:p() kwd("let-math") _ cmd:math_cmd_name() _ pat:pattern()* _ "=" _ expr:expr() e:p()
+        { cst!(let_math_stmt (s, e) [cmd, pat, expr]) }
 
-        rule let_mutable_stmt() -> Cst =
-            s:p() "let-mutable" _ var:var() _ "<-" _ expr:expr() e:p()
-        { cst!((s, e) [var, expr]) }
+        pub rule let_mutable_stmt() -> Cst =
+            s:p() kwd("let-mutable") _ var:var() _ "<-" _ expr:expr() e:p()
+        { cst!(let_mutable_stmt (s, e) [var, expr]) }
 
-        rule type_stmt() -> Cst =
-            s:p() "type" _ t:type_inner() _ ts:(type_inner() ** (_ "and" _)) e:p()
-        { cst!((s, e) [t, ts]) }
+        pub rule type_stmt() -> Cst =
+            s:p() kwd("type") _ t:type_inner() _ ts:(type_inner() ** (_ kwd("and") _)) e:p()
+        { cst!(type_stmt (s, e) [t, ts]) }
 
-        rule type_inner() -> Cst =
+        pub rule type_inner() -> Cst =
             s:p()
             tp:type_param()* _ t:type_name() _ "=" tvs:(type_variant() **  (_ "|" _)) _ c:constraint()*
             e:p()
-            { cst!((s, e) [tp, t, tvs, c]) }
+            { cst!(type_inner (s, e) [tp, t, tvs, c]) }
             / s:p() tp:type_param()* _ t:type_name() _ "=" _ tvs:("|" _ tv:type_variant() {tv})+ _ c:constraint()* e:p()
-            { cst!((s, e) [tp, t, tvs, c]) }
+            { cst!(type_inner (s, e) [tp, t, tvs, c]) }
             / s:p() tp:type_param()* _ tn:type_name() _ "=" _ te:type_expr() _ c:constraint()* e:p()
-            { cst!((s, e) [tp, tn, te, c]) }
+            { cst!(type_inner (s, e) [tp, tn, te, c]) }
 
-        rule type_variant() -> Cst =
-            s:p() v:variant_name() _ "of" _ t:type_expr() e:p() { cst!((s, e) [v, t]) }
-            / s:p() v:variant_name() e:p() { cst!((s, e) [v]) }
+        pub rule type_variant() -> Cst =
+            s:p() v:variant_name() _ kwd("of") _ t:type_expr() e:p() { cst!(type_variant (s, e) [v, t]) }
+            / s:p() v:variant_name() e:p() { cst!(type_variant (s, e) [v]) }
 
-        rule open_stmt() -> Cst =
-            s:p() "open" _ m:module_name() e:p()
-        { cst!((s, e) [m]) }
+        pub rule open_stmt() -> Cst =
+            s:p() kwd("open") _ m:module_name() e:p()
+        { cst!(open_stmt (s, e) [m]) }
 
-        rule arg() -> Cst =
-            s:p() p:pattern() e:p() { cst!((s, e) [p]) }
-            / s:p() "?:" _ p:var_ptn() e:p() { cst!((s, e) [p]) }
+        pub rule arg() -> Cst =
+            s:p() p:pattern() e:p() { cst!(arg (s, e) [p]) }
+            / s:p() "?:" _ p:var_ptn() e:p() { cst!(arg (s, e) [p]) }
 
         // §1. module
 
-        rule module_stmt() -> Cst =
+        pub rule module_stmt() -> Cst =
             s:p()
-            "module" _ n:module_name() _
+            kwd("module") _ n:module_name() _
             sig:(":" _ s:sig_stmt() {s})? _
             "=" _ stmt:struct_stmt()
             e:p()
         { cst!((s, e) [n, sig, stmt]) }
 
         rule sig_stmt() -> Cst =
-            s:p() "sig" _ inners:(sig_inner() ** _) _ "end" e:p()
+            s:p() kwd("sig") _ inners:(sig_inner() ** _) _ kwd("end") e:p()
         { cst!((s, e) [inners]) }
 
         rule struct_stmt() -> Cst =
-            s:p() "struct" _ stmts:(statement() ** _) _ "end" e:p()
+            s:p() kwd("struct") _ stmts:(statement() ** _) _ kwd("end") e:p()
         { cst!((s, e) [stmts]) }
 
         rule sig_inner() -> Cst = sig_type_stmt() / sig_val_stmt() / sig_direct_stmt()
 
         rule sig_type_stmt() -> Cst =
-            s:p() "type" _ tps:(type_param() ** _) _ v:var() _ cs:(constraint() ** _) e:p()
+            s:p() kwd("type") _ tps:(type_param() ** _) _ v:var() _ cs:(constraint() ** _) e:p()
         { cst!((s, e) [tps, v, cs]) }
 
         rule sig_val_stmt() -> Cst =
             s:p()
-            "val" _
+            kwd("val") _
             v:(var() / "(" _ b:bin_operator() _ ")" {b} / inline_cmd_name() / block_cmd_name()) _
             ":" _ t: type_expr() _ cs:(constraint() ** _)
             e:p()
@@ -230,7 +231,7 @@ peg::parser! {
 
         rule sig_direct_stmt() -> Cst =
             s:p()
-            "direct" _
+            kwd("direct") _
             cmd:(inline_cmd_name() / block_cmd_name()) _
             ":" _ t: type_expr() _ cs:(constraint() ** _)
             e:p()
@@ -258,9 +259,9 @@ peg::parser! {
 
         #[cache]
         rule type_unary() -> Cst =
-            t:type_list() _ "inline-cmd" {t}
-            / t:type_list() _ "block-cmd" {t}
-            / t:type_list() _ "math-cmd" {t}
+            t:type_list() _ kwd("inline-cmd") {t}
+            / t:type_list() _ kwd("block-cmd") {t}
+            / t:type_list() _ kwd("math-cmd") {t}
             / type_application()
             / "(" _ t:type_expr() _ ")" {t}
             / type_record()
@@ -311,42 +312,43 @@ peg::parser! {
         { cst!(type_param (s, e) [t]) }
 
         pub rule constraint() -> Cst =
-            s:p() "constraint" t:type_param() _ "::" _ r:type_record() e:p()
+            s:p() kwd("constraint") t:type_param() _ "::" _ r:type_record() e:p()
         { cst!(constraint (s, e) [t, r]) }
 
         // §1. pattern
 
         #[cache]
-        rule match_ptn() -> Cst =
-            s:p() p:pattern() _ "as" _ v:var() e:p() { cst!((s, e) [p, v]) }
-            / s:p() p:pattern() _ "::" _ m:match_ptn() e:p() { cst!((s, e) [p, m]) }
-            / s:p() p:pat_variant() e:p() { cst!((s, e) [p]) }
-            / s:p() p:pattern() e:p() { cst!((s, e) [p]) }
+        pub rule match_ptn() -> Cst =
+            s:p() p:pattern() _ kwd("as") _ v:var() e:p() { cst!(match_ptn (s, e) [p, v]) }
+            / s:p() p:pattern() _ "::" _ m:match_ptn() e:p() { cst!(match_ptn (s, e) [p, m]) }
+            / s:p() p:pat_variant() e:p() { cst!(match_ptn (s, e) [p]) }
+            / s:p() p:pattern() e:p() { cst!(match_ptn (s, e) [p]) }
 
         #[cache]
-        rule pattern() -> Cst =
-            s:p() p:pat_list() e:p() { cst!((s, e) [p]) }
-            / s:p() "(" _ p:match_ptn() _ ")" e:p() { cst!((s, e) [p]) }
-            / s:p() p:pat_tuple() e:p() { cst!((s, e) [p]) }
-            / s:p() "_" e:p() { cst!((s, e)) }
-            / s:p() v:var() e:p() { cst!((s, e) [v]) }
-            / s:p() l:constant() e:p() { cst!((s, e) [l]) }
+        pub rule pattern() -> Cst =
+            s:p() p:pat_list() e:p() { cst!(pattern (s, e) [p]) }
+            / s:p() "(" _ p:match_ptn() _ ")" e:p() { cst!(pattern (s, e) [p]) }
+            / s:p() p:pat_tuple() e:p() { cst!(pattern (s, e) [p]) }
+            / s:p() "_" e:p() { cst!(pattern (s, e)) }
+            / s:p() v:var() e:p() { cst!(pattern (s, e) [v]) }
+            / s:p() l:constant() e:p() { cst!(pattern (s, e) [l]) }
 
-        rule pat_variant() -> Cst =
+        pub rule pat_variant() -> Cst =
             s:p() v:variant_name() _ p:pattern()? e:p()
-        { cst!((s, e) [v, p]) }
+        { cst!(pat_variant (s, e) [v, p]) }
 
-        rule pat_list() -> Cst =
-            s:p() "[" _ "]" e:p() { cst!((s, e)) }
-            / s:p() "[" ms:(match_ptn() ** (_ ";" _)) _ ";"? _ "]" e:p() { cst!((s, e) [ms]) }
+        pub rule pat_list() -> Cst =
+            s:p() "[" _ "]" e:p() { cst!(pat_list (s, e)) }
+            / s:p() "[" ms:(match_ptn() ** (_ ";" _)) _ ";"? _ "]" e:p() { cst!(pat_list (s, e) [ms]) }
 
-        rule pat_tuple() -> Cst =
-            s:p() "(" ms:(match_ptn() ** (_ "," _)) _ ";"? _ ")" e:p() { cst!((s, e) [ms]) }
+        pub rule pat_tuple() -> Cst =
+            s:p() "(" ms:(match_ptn() ** (_ "," _)) _ ";"? _ ")" e:p() { cst!(pat_tuple (s, e) [ms]) }
 
         // §1. expr
         pub rule expr() -> Cst =
             s:p() expr:(
                 match_expr()
+                / bind_stmt()
                 / ctrl_while()
                 / ctrl_if()
                 / lambda()
@@ -361,76 +363,88 @@ peg::parser! {
             ) e:p()
         { cst!(expr (s, e) [expr]) }
 
-        rule match_expr() -> Cst =
-            s:p() "match" _ expr:expr() _ "with" _ "|"? arms:(match_arm() ** (_ "|" _)) e:p()
-        { cst!((s, e) [expr, arms]) }
+        pub rule match_expr() -> Cst =
+            s:p() kwd("match") _ expr:expr() _ kwd("with") _ "|"? arms:(match_arm() ** (_ "|" _)) e:p()
+        { cst!(match_expr (s, e) [expr, arms]) }
 
-        rule match_arm() -> Cst =
+        pub rule bind_stmt() -> Cst =
+            s:p() stmt:(let_stmt() / let_rec_stmt() / let_math_stmt() / let_mutable_stmt())
+            _ kwd("in") _ expr:expr() e:p()
+        { cst!(bind_stmt (s, e) [stmt, expr]) }
+
+        pub rule match_arm() -> Cst =
             s:p()
-            ptn:match_ptn() _ "when" _ cond:(!match_expr() e:expr() {e}) _ "->" expr:(!match_expr() e:expr() {e})
+            ptn:match_ptn() _ kwd("when") _ cond:(!match_expr() e:expr() {e}) _ "->" expr:(!match_expr() e:expr() {e})
             e:p()
-            { cst!((s, e) [ptn, cond, expr]) }
+            { cst!(match_arm (s, e) [ptn, cond, expr]) }
             /
-            s:p() ptn:match_ptn() _ "->" expr:(!match_expr() e:expr() {e}) e:p() { cst!((s, e) [ptn, expr]) }
+            s:p() ptn:match_ptn() _ "->" expr:(!match_expr() e:expr() {e}) e:p() { cst!(match_arm (s, e) [ptn, expr]) }
 
-        rule ctrl_while() -> Cst =
-            s:p() "while" _ cond:expr() _ "do" _ expr:expr() e:p()
-        { cst!((s, e) [cond, expr]) }
+        pub rule ctrl_while() -> Cst =
+            s:p() kwd("while") _ cond:expr() _ kwd("do") _
+            expr:(!(match_expr() / bind_stmt()) e:expr() {e})
+            e:p()
+        { cst!(ctrl_while (s, e) [cond, expr]) }
 
-        rule ctrl_if() -> Cst =
-            s:p() "if" _ cond:expr() _ "then" _ et:expr() _ "else" ee:expr() e:p()
-        { cst!((s, e) [cond, et, ee]) }
+        pub rule ctrl_if() -> Cst =
+            s:p() kwd("if") _ cond:expr() _ kwd("then") _ et:expr() _ kwd("else") _ ee:expr() e:p()
+        { cst!(ctrl_if (s, e) [cond, et, ee]) }
 
-        rule lambda() -> Cst =
-            s:p() "fun" _ ptns:(pattern() ++ _) _ "->" _ expr:expr() e:p()
-        { cst!((s, e) [ptns, expr]) }
+        pub rule lambda() -> Cst =
+            s:p() kwd("fun") _ ptns:(pattern() ++ _) _ "->" _ expr: expr_inner_lambda() e:p()
+        { cst!(lambda (s, e) [ptns, expr]) }
 
-        rule assignment() -> Cst =
-            s:p() v:var() _ "<-" _ expr: expr() e:p()
-        { cst!((s, e) [v, expr]) }
+        pub rule assignment() -> Cst =
+            s:p() v:var() _ "<-" _ expr: expr_inner_lambda() e:p()
+        { cst!(assignment (s, e) [v, expr]) }
 
-        rule dyadic_expr() -> Cst =
+        rule expr_inner_lambda() -> Cst =
+            dyadic_expr() / unary_operator_expr() / variant_constructor() / application() / unary()
+
+        pub rule dyadic_expr() -> Cst =
             s:p()
             t1:(unary_operator_expr() / variant_constructor() / application() / unary())
             _ op:bin_operator()
-            _ t2:(dyadic_expr() / unary_operator_expr() / variant_constructor() / application() / unary())
+            _ t2:(dyadic_expr() / variant_constructor() / application() / unary())
             e:p()
-        { cst!((s, e) [t1, op, t2]) }
+        { cst!(dyadic_expr (s, e) [t1, op, t2]) }
 
-        rule unary_operator_expr() -> Cst =
+        pub rule unary_operator_expr() -> Cst =
             s:p() op:unary_operator() _ expr:(application() / record_member() / unary()) e:p()
-        { cst!((s, e) [op, expr]) }
+        { cst!(unary_operator_expr (s, e) [op, expr]) }
 
-        rule unary_operator() -> Cst =
-            s:p() ("-" / "not") e:p()
-        { cst!((s, e)) }
+        pub rule unary_operator() -> Cst =
+            s:p() ("-" / kwd("not") ) e:p()
+        { cst!(unary_operator (s, e)) }
 
-        rule application() -> Cst =
+        pub rule application() -> Cst =
             s:p()
             v:(var() / modvar()) _
             args:(application_args() ++ _)
             e:p()
-        { cst!((s, e) [v, args]) }
+        { cst!(application (s, e) [v, args]) }
 
         rule application_args() -> Cst = application_args_optional() / application_args_normal()
 
-        rule application_args_optional() -> Cst =
-            s:p() "?:" _ u:unary() e:p() { cst!((s, e) [u]) }
-            / s:p() "?*" e:p() { cst!((s, e)) }
+        pub rule application_args_optional() -> Cst =
+            s:p() "?:" _ u:unary() e:p() { cst!(application_args_optional (s, e) [u]) }
+            / s:p() "?*" e:p() { cst!(application_args_optional (s, e)) }
 
-        rule application_args_normal() -> Cst =
+        pub rule application_args_normal() -> Cst =
             s:p() u:(unary() / variant_name()) e:p()
-        { cst!((s, e) [u]) }
+        { cst!(application_args_normal (s, e) [u]) }
 
-        rule command_application() -> Cst = "command" _ n:inline_cmd_name() {n}
+        pub rule command_application() -> Cst =
+            s:p() kwd("command") _ n:inline_cmd_name() e:p()
+        { cst!(command_application (s, e) [n]) }
 
-        rule record_member() -> Cst =
+        pub rule record_member() -> Cst =
             s:p() u:unary() _ "#" _ v:var() e:p()
-        { cst!((s, e) [u, v]) }
+        { cst!(record_member (s, e) [u, v]) }
 
-        rule variant_constructor() -> Cst =
+        pub rule variant_constructor() -> Cst =
             s:p() v:variant_name() _ u:unary()? e:p()
-        { cst!((s, e) [v, u]) }
+        { cst!(variant_constructor (s, e) [v, u]) }
 
         // §1. unary
 
@@ -466,7 +480,7 @@ peg::parser! {
 
         pub rule record() -> Cst =
             s:p() "(|" _ "|)" e:p() { cst!(record (s, e)) }
-            / s:p() "(" _ "|" _ u:unary() _ "with" _ i:record_inner() _ "|" _ ")" e:p() { cst!(record (s, e) [u, i]) }
+            / s:p() "(" _ "|" _ u:unary() _ kwd("with") _ i:record_inner() _ "|" _ ")" e:p() { cst!(record (s, e) [u, i]) }
             / s:p() "(" _ "|" _ i:record_inner() _ "|" _ ")" e:p() { cst!(record (s, e) [i]) }
 
         rule record_inner() -> Vec<Cst> =
@@ -485,7 +499,7 @@ peg::parser! {
             s:p() "(" _ expr:expr() _ "," _ exprs:(expr() ++ (_ "," _)) _ ")" e:p() { cst!(tuple (s, e) [expr, exprs]) }
 
         pub rule bin_operator() -> Cst =
-            s:p() (bin_operator_start() bin_operator_succ()* / "::" / "mod") e:p()
+            s:p() (bin_operator_start() bin_operator_succ()* / "::" / kwd("mod")) e:p()
         { cst!(bin_operator (s, e)) }
         rule bin_operator_start() =
             [ '-' | '+' | '*' | '/' | '^' | '&' | '|' | '=' | '<' | '>' ]
@@ -548,7 +562,7 @@ peg::parser! {
             s:p() "(" _ ")" e:p() { cst!(const_unit (s, e)) }
 
         pub rule const_bool() -> Cst =
-            s:p() ("true" / "false") e:p() {cst!(const_bool (s, e))}
+            s:p() (kwd("true") / kwd("false")) e:p() {cst!(const_bool (s, e))}
 
         pub rule const_int() -> Cst =
             s:p() (const_int_decimal() / const_int_hex() / "0") e:p() { cst!(const_int (s, e)) }

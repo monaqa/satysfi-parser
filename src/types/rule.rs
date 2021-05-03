@@ -38,6 +38,24 @@ make_rule! {
     header_import,
     pkgname,
 
+    // statement
+    let_stmt,
+    let_rec_stmt,
+    let_rec_inner,
+    let_rec_matcharm,
+    let_inline_stmt_ctx,
+    let_inline_stmt_noctx,
+    let_block_stmt_ctx,
+    let_block_stmt_noctx,
+    let_math_stmt,
+    let_mutable_stmt,
+    type_stmt,
+    type_inner,
+    type_variant,
+    module_stmt,
+    open_stmt,
+    arg,
+
     // types
     type_expr,
     type_optional,
@@ -51,8 +69,31 @@ make_rule! {
     type_param,
     constraint,
 
+    // pattern
+    match_ptn,
+    pattern,
+    pat_variant,
+    pat_list,
+    pat_tuple,
+
     // expr
     expr,
+    match_expr,
+    bind_stmt,
+    match_arm,
+    ctrl_while,
+    ctrl_if,
+    lambda,
+    assignment,
+    dyadic_expr,
+    unary_operator_expr,
+    unary_operator,
+    application,
+    application_args_normal,
+    application_args_optional,
+    command_application,
+    record_member,
+    variant_constructor,
 
     // unary
     unary,

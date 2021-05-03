@@ -46,6 +46,12 @@ impl<T> Vectorize<T> for Vec<Option<T>> {
     }
 }
 
+impl<T> Vectorize<T> for Option<Vec<T>> {
+    fn vectorize(self) -> Vec<T> {
+        self.unwrap_or_default()
+    }
+}
+
 /// CST にテキストの情報を付加したもの。
 // TODO: 自己参照構造体にする。
 #[derive(Debug, PartialEq, Eq)]

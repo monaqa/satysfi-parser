@@ -8,6 +8,7 @@ use crate::{assert_not_parsed, assert_parsed, comp_cst, cst_inner};
 
 mod commands;
 mod constant;
+mod expr;
 mod header;
 mod horizontal;
 mod math;
