@@ -82,18 +82,17 @@ fn bin_operator() {
     assert_parsed!("mod" bin_operator: []);
     assert_parsed!("+" bin_operator: []);
     assert_parsed!(">" bin_operator: []);
-    assert_parsed!("|" bin_operator: []);
     assert_parsed!("+." bin_operator: []);
     assert_parsed!("++" bin_operator: []);
     assert_parsed!("+++" bin_operator: []);
     assert_parsed!("+~" bin_operator: []);
     assert_parsed!("+~=" bin_operator: []);
     assert_parsed!("+^+" bin_operator: []);
-
+    assert_parsed!("->>" bin_operator: []);
     assert_parsed!("|>" bin_operator: []);
-    // TODO: "->" が通る仕様のままで良いか検討
-    assert_parsed!("->" bin_operator: []);
 
+    assert_not_parsed!("->" bin_operator: []);
+    assert_not_parsed!("|" bin_operator: []);
     assert_not_parsed!("moda" bin_operator: []);
     assert_not_parsed!("!=" bin_operator: []);
 }
@@ -214,9 +213,13 @@ fn unary() {
 
     assert_parsed!("(+)" unary: ["+" bin_operator: [_]; ]);
     assert_parsed!("( + )" unary: ["+" bin_operator: [_]; ]);
+    assert_parsed!("( |>)" unary: ["|>" bin_operator: [_]; ]);
     assert_parsed!("(1)" unary: ["1" expr: [_]; ]);
     assert_parsed!("1" unary: ["1" constant: [_]; ]);
     assert_parsed!("Mod.(1)" unary: ["Mod.(1)" expr_with_mod: [_];]);
     assert_parsed!("Mod.foo" unary: ["Mod.foo" modvar: [_];]);
     assert_parsed!("foo" unary: ["foo" var: [_];]);
+
+    // TODO: Original SATySFi parser doesn't allow "(|>)" as binary operator
+    // assert_not_parsed!("(|>)" unary: [_]);
 }

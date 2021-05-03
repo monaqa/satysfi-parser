@@ -76,6 +76,8 @@ fn horizontal_single() {
         "${v}" math_text: [_];
         ")" regular_text: [];
     ]);
+
+    assert_not_parsed!("# foo;" horizontal_single: [_]);
 }
 
 #[test]

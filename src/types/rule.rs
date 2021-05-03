@@ -79,8 +79,9 @@ make_rule! {
     // expr
     expr,
     match_expr,
-    bind_stmt,
     match_arm,
+    match_guard,
+    bind_stmt,
     ctrl_while,
     ctrl_if,
     lambda,
@@ -156,4 +157,5 @@ make_rule! {
     math_sup,
     math_sub,
     math_unary,
+    math_embedding,
 }

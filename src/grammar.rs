@@ -129,7 +129,7 @@ peg::parser! {
 
         pub rule let_rec_stmt() -> Cst =
             s:p() kwd("let-rec") _ inner:let_rec_inner() _ inners:(let_rec_inner() ** (_ kwd("and") _)) e:p()
-        { cst!((s, e) [inner, inners]) }
+        { cst!(let_rec_stmt (s, e) [inner, inners]) }
 
         pub rule let_rec_inner() -> Cst =
             s:p()
@@ -364,7 +364,7 @@ peg::parser! {
         { cst!(expr (s, e) [expr]) }
 
         pub rule match_expr() -> Cst =
-            s:p() kwd("match") _ expr:expr() _ kwd("with") _ "|"? arms:(match_arm() ** (_ "|" _)) e:p()
+            s:p() kwd("match") _ expr:expr() _ kwd("with") _ "|"? _ arms:(match_arm() ** (_ "|" _)) e:p()
         { cst!(match_expr (s, e) [expr, arms]) }
 
         pub rule bind_stmt() -> Cst =
@@ -374,11 +374,15 @@ peg::parser! {
 
         pub rule match_arm() -> Cst =
             s:p()
-            ptn:match_ptn() _ kwd("when") _ cond:(!match_expr() e:expr() {e}) _ "->" expr:(!match_expr() e:expr() {e})
+            ptn:match_ptn() _ guard:match_guard()? _ "->" _ expr:(!match_expr() e:expr() {e})
             e:p()
-            { cst!(match_arm (s, e) [ptn, cond, expr]) }
-            /
-            s:p() ptn:match_ptn() _ "->" expr:(!match_expr() e:expr() {e}) e:p() { cst!(match_arm (s, e) [ptn, expr]) }
+            { cst!(match_arm (s, e) [ptn, guard, expr]) }
+
+        pub rule match_guard() -> Cst =
+            s:p()
+            kwd("when") _ cond:(!match_expr() e:expr() {e})
+            e:p()
+            { cst!(match_guard (s, e) [cond]) }
 
         pub rule ctrl_while() -> Cst =
             s:p() kwd("while") _ cond:expr() _ kwd("do") _
@@ -499,13 +503,14 @@ peg::parser! {
             s:p() "(" _ expr:expr() _ "," _ exprs:(expr() ++ (_ "," _)) _ ")" e:p() { cst!(tuple (s, e) [expr, exprs]) }
 
         pub rule bin_operator() -> Cst =
-            s:p() (bin_operator_start() bin_operator_succ()* / "::" / kwd("mod")) e:p()
+            s:p() !bin_operator_except() (bin_operator_start() bin_operator_succ()* / "::" / kwd("mod")) e:p()
         { cst!(bin_operator (s, e)) }
         rule bin_operator_start() =
             [ '-' | '+' | '*' | '/' | '^' | '&' | '|' | '=' | '<' | '>' ]
         rule bin_operator_succ() =
             [ '-' | '+' | '*' | '/' | '^' | '&' | '|' | '=' | '<' | '>'
                   | '!' | ':' | '~' | '\'' | '.' | '?' ]
+        rule bin_operator_except() = ("->" / "<-" / "|") !bin_operator_succ()
 
         pub rule expr_with_mod() -> Cst =
             s:p() m:module_name() ".(" _ expr:expr() _ ")" e:p()
@@ -691,7 +696,7 @@ peg::parser! {
             / regular_text()
 
         pub rule inline_text_embedding() -> Cst =
-            s:p() "#" _ inner:(var_ptn() / modvar()) _ ";" e:p()
+            s:p() "#" inner:(var_ptn() / modvar()) _ ";" e:p()
         { cst!(inline_text_embedding (s, e) [inner]) }
 
         pub rule regular_text() -> Cst =
@@ -730,7 +735,7 @@ peg::parser! {
         rule vertical_element() -> Cst = block_cmd() / block_text_embedding()
 
         pub rule block_text_embedding() -> Cst =
-            s:p() "#" _ inner:(var_ptn() / modvar()) _ ";" e:p()
+            s:p() "#" inner:(var_ptn() / modvar()) _ ";" e:p()
         { cst!(block_text_embedding (s, e) [inner]) }
 
         // §1. math mode
@@ -761,6 +766,11 @@ peg::parser! {
             / s:p() r"\" math_special_char() e:p() { cst!(math_unary (s, e)) }
             / s:p() math_symbol() e:p() { cst!(math_unary (s, e)) }
             / s:p() m:math_cmd() e:p() { cst!(math_unary (s, e) [m]) }
+            / s:p() m:math_embedding() e:p() { cst!(math_unary (s, e) [m]) }
+
+        pub rule math_embedding() -> Cst =
+            s:p() "#" inner:(var_ptn() / modvar()) e:p()
+        { cst!(math_embedding (s, e) [inner]) }
 
         rule math_special_char() = [
             ' ' | '!' | '"' | '#' | '$' | '%' | '&' | '\''

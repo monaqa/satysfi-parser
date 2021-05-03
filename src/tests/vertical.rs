@@ -6,6 +6,7 @@ fn block_text_embedding() {
     assert_parsed!("#Foo.bar;" block_text_embedding: ["Foo.bar" modvar: [_];]);
     assert_not_parsed!("#foo" block_text_embedding: [_]);
     assert_not_parsed!("#Foo" block_text_embedding: [_]);
+    assert_not_parsed!("# foo;" block_text_embedding: [_]);
 }
 
 #[test]

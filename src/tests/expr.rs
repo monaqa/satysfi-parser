@@ -166,4 +166,34 @@ fn ctrl_while() {
 #[test]
 fn bind_stmt() {
     assert_parsed!("let x = 1 in x" bind_stmt: ["let x = 1" let_stmt: [_]; "x" expr: [_]; ]);
+    assert_parsed!("let-rec aux x = x in aux" bind_stmt: ["let-rec aux x = x " let_rec_stmt: [_]; "aux" expr: [_]; ]);
+    assert_parsed!(r"let-math \foo x = ${ab#x} in ${\foo{c}}" bind_stmt: [
+        r"let-math \foo x = ${ab#x}" let_math_stmt: [_];
+        r"${\foo{c}}" expr: [_];
+    ]);
+}
+
+#[test]
+fn match_arm() {
+    assert_parsed!("Some(x) -> x" match_arm: ["Some(x)" match_ptn: [_]; "x" expr: [_]; ]);
+    assert_parsed!("Some(x) when x < 5 -> x" match_arm: [
+        "Some(x)" match_ptn: [_];
+        "when x < 5" match_guard: [_];
+        "x" expr: [_];
+    ]);
+    assert_not_parsed!("Some(x) -> x | None -> 1" match_arm: [_]);
+}
+
+#[test]
+fn match_guard() {
+    assert_parsed!("when x < 5" match_guard: ["x < 5" expr: [_]; ]);
+}
+
+#[test]
+fn match_expr() {
+    assert_parsed!("match x with | Some(x) -> x | None -> 1" match_expr: [
+        "x" expr: [_];
+        "Some(x) -> x" match_arm: [_];
+        "None -> 1" match_arm: [_];
+    ]);
 }

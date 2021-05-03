@@ -39,6 +39,12 @@ fn math_token() {
 }
 
 #[test]
+fn math_embedding() {
+    assert_parsed!("#a" math_embedding: ["a" var_ptn: []; ]);
+    assert_parsed!("#Foo.a" math_embedding: ["Foo.a" modvar: [_]; ]);
+}
+
+#[test]
 fn math_single() {
     assert_parsed!("abc" math_single: [
         "a" math_token, math_unary: [];
