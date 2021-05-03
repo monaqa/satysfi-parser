@@ -52,7 +52,28 @@ make_rule! {
     constraint,
 
     // expr
+    expr,
     math_text,
+
+    // unary
+    list,
+    record,
+    record_unit,
+    tuple,
+
+    // command
+    cmd_name_ptn,
+    cmd_expr_arg,
+    cmd_expr_option,
+    cmd_text_arg,
+    inline_cmd,
+    inline_cmd_name,
+    block_cmd,
+    block_cmd_name,
+    math_cmd,
+    math_cmd_name,
+    math_cmd_expr_arg,
+    math_cmd_expr_option,
 
     // horizontal
     horizontal_single,
@@ -76,16 +97,10 @@ make_rule! {
     const_length,
     const_string,
 
-    // command
-    inline_cmd,
-    inline_cmd_name,
-    block_cmd,
-    block_cmd_name,
-    math_cmd,
-
     // expr
     module_name,
     modvar,
+    mod_cmd_name,
     var,
     var_ptn,
 

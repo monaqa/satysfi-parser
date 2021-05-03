@@ -70,16 +70,10 @@ fn horizontal_single() {
 }
 
 #[test]
-fn inline_cmd() {
-    assert_parsed!(r"\a;" inline_cmd: [_]);
-    assert_parsed!(r"\a{}" inline_cmd: [_]);
-}
-
-#[test]
 fn test_horizontal_recursive() {
     assert_parsed!(r"\a;" horizontal_single: [
         r"\a;" inline_cmd: [
-            r"\a" inline_cmd_name: ["a" var_ptn: [];];
+            r"\a" inline_cmd_name: ["a" cmd_name_ptn: [];];
         ];
     ]);
 
