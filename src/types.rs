@@ -1,4 +1,58 @@
+use std::fmt::Display;
+
 use self::rule::Rule;
+
+pub trait Vectorize<T> {
+    /// 色んなものを強引に vector にしてしまう恐ろしいメソッド。
+    /// 構文解析ではオプショナルな構文要素があったり、配列状の構文要素があったりするため
+    /// それらを楽にまとめて1つの Vec に格納してしまうための処置。
+    fn vectorize(self) -> Vec<T>;
+}
+
+impl<T> Vectorize<T> for Vec<T> {
+    /// vec![t] のときはそのまま
+    fn vectorize(self) -> Vec<T> {
+        self
+    }
+}
+
+impl<T> Vectorize<T> for T {
+    /// t のときは vec![t] に変換される
+    fn vectorize(self) -> Vec<T> {
+        vec![self]
+    }
+}
+
+impl<T> Vectorize<T> for Vec<Vec<T>> {
+    /// T の可変長配列の concat が一発でできる
+    fn vectorize(self) -> Vec<T> {
+        let mut vec = vec![];
+        for v in self {
+            vec.extend(v);
+        }
+        vec
+    }
+}
+
+impl<T> Vectorize<T> for Option<T> {
+    /// Some(t) は vec![t] に、 None は vec![] に変換される
+    fn vectorize(self) -> Vec<T> {
+        self.into_iter().collect()
+    }
+}
+
+impl<T> Vectorize<T> for Vec<Option<T>> {
+    /// vec![ Some(a), None, Some(c), Some(d), None ] は vec![a, c, d] になる
+    fn vectorize(self) -> Vec<T> {
+        self.into_iter().filter_map(|e| e).collect()
+    }
+}
+
+impl<T> Vectorize<T> for Option<Vec<T>> {
+    fn vectorize(self) -> Vec<T> {
+        self.unwrap_or_default()
+    }
+}
 
 /// CST にテキストの情報を付加したもの。
 // TODO: 自己参照構造体にする。
@@ -30,10 +84,39 @@ impl CstText {
     }
 }
 
+impl Display for CstText {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        fn print_cst(text: &str, cst: &Cst, indent: usize) -> String {
+            let mut s = String::new();
+
+            s.push_str(&"  ".repeat(indent));
+            s.push_str(&format!("[{:?}]", cst.rule));
+
+            // 長すぎないものだけテキストを表示
+            let (start, end) = cst.range;
+            let slice = &text[start..end];
+            if !slice.contains('\n') && slice.len() < 80 {
+                s.push_str(&format!(": \"{}\"", slice));
+            }
+
+            s.push('\n');
+
+            for child in &cst.inner {
+                s.push_str(&print_cst(text, child, indent + 1))
+            }
+            s
+        }
+
+        let text = print_cst(&self.text, &self.cst, 0);
+        write!(f, "{}", text)
+    }
+}
+
 /// Concrete syntax tree.
 /// 1つの CST は構文規則、テキストの範囲、子要素からなり、全体として木構造をなす。
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub struct Cst {
+    /// 構文規則。
     pub rule: Rule,
     pub range: (usize, usize),
     pub inner: Vec<Cst>,
@@ -42,22 +125,12 @@ pub struct Cst {
 pub mod rule;
 
 impl Cst {
-    // /// 新たな CST を作成する。
-    // pub fn new(rule: Rule, range: (usize, usize), inner: Vec<Cst>) -> Self {
-    //     Self { rule, range, inner }
-    // }
-
-    /// Rule と range を指定して、葉に相当する（子のない） node を生成する。
-    pub fn new_leaf(rule: Rule, range: (usize, usize)) -> Self {
-        Self {
-            rule,
-            range,
-            inner: vec![],
-        }
+    /// 新たな CST を作成する。
+    pub fn new(rule: Rule, range: (usize, usize), inner: Vec<Cst>) -> Self {
+        Self { rule, range, inner }
     }
 
-    /// Rule と子を指定して、枝に相当する（子のある） node を生成する。
-    /// 省略した range は子の range の最小・最大から計算される。
+    /// 新たな CST を作成する。
     pub fn new_node(rule: Rule, inner: Vec<Cst>) -> Self {
         let range = inner.iter().fold((usize::MAX, 0), |acc, cst| {
             let (acc_start, acc_end) = acc;
@@ -71,4 +144,75 @@ impl Cst {
         let (s, e) = self.range;
         &text[s..e]
     }
+}
+
+#[macro_export]
+macro_rules! cst {
+    // - Rule name: 省略可能
+    // - range: inner があるときのみ省略可能
+    // - inner: 省略可能、リストの形で直接記載可能
+
+    // 省略なし + inner リスト形式
+    ($rule:ident ($s:expr, $e:expr) [$($inner:expr),*]) => {
+        Cst {
+            rule: Rule::$rule,
+            range: ($s, $e),
+            inner: vec![$($inner.vectorize()),*].vectorize()
+        }
+    };
+    // 省略なし
+    ($rule:ident ($s:expr, $e:expr); $inner:expr) => {
+        Cst {
+            rule: Rule::$rule,
+            range: ($s, $e),
+            inner: $inner
+        }
+    };
+
+    // range 省略
+    ($rule:ident [$($inner:expr),*]) => {
+        Cst::new_node(Rule::$rule, vec![$($inner.vectorize()),*].vectorize())
+    };
+    ($rule:ident; $inner:expr) => {
+        Cst::new_node(Rule::$rule, $inner)
+    };
+
+    // inner 省略
+    ($rule:ident ($s:expr, $e:expr)) => {
+        Cst {
+            rule: Rule::$rule,
+            range: ($s, $e),
+            inner: vec![]
+        }
+    };
+
+    // rule 省略
+    (($s:expr, $e:expr) [$($inner:expr),*]) => {
+        Cst {
+            rule: Rule::misc,
+            range: ($s, $e),
+            inner: vec![$($inner.vectorize()),*].vectorize()
+        }
+    };
+    (($s:expr, $e:expr); $inner:expr) => {
+        Cst {
+            rule: Rule::misc,
+            range: ($s, $e),
+            inner: $inner
+        }
+    };
+
+    // rule, range 省略
+    ([$($inner:expr),*]) => {
+        Cst::new_node(Rule::misc, vec![$($inner.vectorize()),*].vectorize())
+    };
+
+    // rule, inner 省略
+    (($s:expr, $e:expr)) => {
+        Cst {
+            rule: Rule::misc,
+            range: ($s, $e),
+            inner: vec![]
+        }
+    };
 }

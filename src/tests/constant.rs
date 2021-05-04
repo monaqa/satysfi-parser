@@ -1,13 +1,13 @@
 use super::*;
 
 #[test]
-fn test_unit() {
+fn const_unit() {
     assert_parsed!("()" const_unit: []);
     assert_parsed!("( )" const_unit: []);
 }
 
 #[test]
-fn test_boolean() {
+fn const_boolean() {
     assert_parsed!("true" const_bool: []);
     assert_parsed!("false" const_bool: []);
 
@@ -16,7 +16,7 @@ fn test_boolean() {
 }
 
 #[test]
-fn test_int() {
+fn const_int() {
     assert_parsed!("0" const_int: []);
     assert_parsed!("1" const_int: []);
     assert_parsed!("1230" const_int: []);
@@ -29,7 +29,7 @@ fn test_int() {
 }
 
 #[test]
-fn test_float() {
+fn const_float() {
     assert_parsed!("0.3" const_float: []);
     assert_parsed!("42.195" const_float: []);
     assert_parsed!(".195" const_float: []);
@@ -40,8 +40,9 @@ fn test_float() {
 }
 
 #[test]
-fn test_length() {
+fn const_length() {
     assert_parsed!("1pt" const_length: []);
+    assert_parsed!("0pt" const_length: []);
     assert_parsed!("1abc" const_length: []);
     assert_parsed!("1a5F9-" const_length: []);
     assert_parsed!("0.3pt" const_length: []);
@@ -55,7 +56,7 @@ fn test_length() {
 }
 
 #[test]
-fn test_string() {
+fn const_string() {
     assert_parsed!("`a`" const_string: []);
     assert_parsed!("`a`" const_string: []);
     assert_parsed!("#`a`" const_string: []);
@@ -68,4 +69,9 @@ fn test_string() {
     assert_not_parsed!("``" const_string: []);
     assert_not_parsed!("``` ``` ```" const_string: []);
     assert_not_parsed!("`` aaa ```" const_string: []);
+}
+
+#[test]
+fn constant() {
+    assert_parsed!("0pt" constant, const_length: []);
 }
