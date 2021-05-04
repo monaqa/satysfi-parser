@@ -176,10 +176,10 @@ fn horizontal_text() {
         "|abc|" horizontal_list: ["abc" horizontal_single: [_]; ];
     ]);
     assert_parsed!("{ | abc | }" horizontal_text: [
-        "| abc |" horizontal_list: [" abc " horizontal_single: [_]; ];
+        "| abc | " horizontal_list: [" abc " horizontal_single: [_]; ];
     ]);
     assert_parsed!("{ | abc | | }" horizontal_text: [
-        "| abc | |" horizontal_list: [
+        "| abc | | " horizontal_list: [
             " abc " horizontal_single: [_];
             " " horizontal_single: [_];
         ];

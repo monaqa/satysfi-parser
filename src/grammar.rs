@@ -24,6 +24,7 @@ peg::parser! {
 
         /// WHITESPACE
         rule _() = ([' ' | '\t' | '\n' | '\r'] / comment())*
+        rule __() = comment()*
 
         /// alias for position
         rule p() -> usize = pos:position!() {pos}
@@ -697,7 +698,7 @@ peg::parser! {
             / horizontal_single()
 
         pub rule horizontal_single() -> Cst =
-            s:p() inners:horizontal_token()* e:p() { cst!(horizontal_single (s, e) [inners]) }
+            s:p() __ inners:(horizontal_token() ** __) __ e:p() { cst!(horizontal_single (s, e) [inners]) }
 
         rule horizontal_token() -> Cst =
             const_string()
@@ -723,7 +724,7 @@ peg::parser! {
             ['@' | '`' | '\\' | '{' | '}' | '%' | '|' | '*' | '$' | '#' | ';']
 
         pub rule horizontal_list() -> Cst =
-            s:p() _ "|" inners:horizontal_list_inner()+ e:p()
+            s:p() _ "|" inners:horizontal_list_inner()+ _ e:p()
             { cst!(horizontal_list (s, e) [inners]) }
         rule horizontal_list_inner() -> Cst = inner:horizontal_single() "|" {inner}
 
