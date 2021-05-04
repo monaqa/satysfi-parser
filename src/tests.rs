@@ -14,7 +14,6 @@ mod horizontal;
 mod math;
 mod pattern;
 mod statement;
-mod term;
 mod types;
 mod unary;
 mod vertical;

@@ -54,11 +54,25 @@ impl<T> Vectorize<T> for Option<Vec<T>> {
     }
 }
 
+/// コードの範囲を表すもの。 usize 2 個ぶんなので Copyable.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Span {
+    pub start: usize,
+    pub end: usize,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct LineCol {
+    pub line: usize,
+    pub column: usize,
+}
+
 /// CST にテキストの情報を付加したもの。
 // TODO: 自己参照構造体にする。
 #[derive(Debug, PartialEq, Eq)]
 pub struct CstText {
     pub text: String,
+    pub lines: Vec<usize>,
     pub cst: Cst,
 }
 
@@ -69,9 +83,12 @@ impl CstText {
         F: Fn(&str) -> std::result::Result<Cst, E>,
         E: Send,
     {
+        let mut lines = vec![0usize];
+        lines.extend(text.match_indices('\n').map(|(p, _)| p + 1));
         let cst = parser(text)?;
         Ok(CstText {
             text: text.to_owned(),
+            lines,
             cst,
         })
     }
@@ -79,8 +96,21 @@ impl CstText {
     /// self.cst の子要素である Cst について、その要素に相当する text を取得する。
     pub fn get_text(&self, cst: &Cst) -> &str {
         let text = self.text.as_str();
-        let (s, e) = cst.range;
-        &text[s..e]
+        let Span { start, end } = cst.span;
+        &text[start..end]
+    }
+
+    /// 与えられた position の line 及び col を出力する。
+    pub fn get_line_col(&self, pos: usize) -> Option<LineCol> {
+        if pos > self.text.len() {
+            return None;
+        }
+        let line = match self.lines.binary_search(&pos) {
+            Ok(i) => i,
+            Err(i) => i - 1,
+        };
+        let column = pos - self.lines[line];
+        Some(LineCol { line, column })
     }
 }
 
@@ -93,7 +123,7 @@ impl Display for CstText {
             s.push_str(&format!("[{:?}]", cst.rule));
 
             // 長すぎないものだけテキストを表示
-            let (start, end) = cst.range;
+            let Span { start, end } = cst.span;
             let slice = &text[start..end];
             if !slice.contains('\n') && slice.len() < 80 {
                 s.push_str(&format!(": \"{}\"", slice));
@@ -118,7 +148,7 @@ impl Display for CstText {
 pub struct Cst {
     /// 構文規則。
     pub rule: Rule,
-    pub range: (usize, usize),
+    pub span: Span,
     pub inner: Vec<Cst>,
 }
 
@@ -127,22 +157,16 @@ pub mod rule;
 impl Cst {
     /// 新たな CST を作成する。
     pub fn new(rule: Rule, range: (usize, usize), inner: Vec<Cst>) -> Self {
-        Self { rule, range, inner }
-    }
-
-    /// 新たな CST を作成する。
-    pub fn new_node(rule: Rule, inner: Vec<Cst>) -> Self {
-        let range = inner.iter().fold((usize::MAX, 0), |acc, cst| {
-            let (acc_start, acc_end) = acc;
-            let (cst_start, cst_end) = cst.range;
-            (acc_start.min(cst_start), acc_end.max(cst_end))
-        });
-        Self { rule, range, inner }
+        let span = Span {
+            start: range.0,
+            end: range.1,
+        };
+        Self { rule, span, inner }
     }
 
     pub fn as_str<'a>(&'a self, text: &'a str) -> &'a str {
-        let (s, e) = self.range;
-        &text[s..e]
+        let Span { start, end } = self.span;
+        &text[start..end]
     }
 }
 
@@ -156,7 +180,7 @@ macro_rules! cst {
     ($rule:ident ($s:expr, $e:expr) [$($inner:expr),*]) => {
         Cst {
             rule: Rule::$rule,
-            range: ($s, $e),
+            span: Span {start: $s, end: $e},
             inner: vec![$($inner.vectorize()),*].vectorize()
         }
     };
@@ -164,24 +188,16 @@ macro_rules! cst {
     ($rule:ident ($s:expr, $e:expr); $inner:expr) => {
         Cst {
             rule: Rule::$rule,
-            range: ($s, $e),
+            span: Span {start: $s, end: $e},
             inner: $inner
         }
-    };
-
-    // range 省略
-    ($rule:ident [$($inner:expr),*]) => {
-        Cst::new_node(Rule::$rule, vec![$($inner.vectorize()),*].vectorize())
-    };
-    ($rule:ident; $inner:expr) => {
-        Cst::new_node(Rule::$rule, $inner)
     };
 
     // inner 省略
     ($rule:ident ($s:expr, $e:expr)) => {
         Cst {
             rule: Rule::$rule,
-            range: ($s, $e),
+            span: Span {start: $s, end: $e},
             inner: vec![]
         }
     };
@@ -190,28 +206,23 @@ macro_rules! cst {
     (($s:expr, $e:expr) [$($inner:expr),*]) => {
         Cst {
             rule: Rule::misc,
-            range: ($s, $e),
+            span: Span {start: $s, end: $e},
             inner: vec![$($inner.vectorize()),*].vectorize()
         }
     };
     (($s:expr, $e:expr); $inner:expr) => {
         Cst {
             rule: Rule::misc,
-            range: ($s, $e),
+            span: Span {start: $s, end: $e},
             inner: $inner
         }
-    };
-
-    // rule, range 省略
-    ([$($inner:expr),*]) => {
-        Cst::new_node(Rule::misc, vec![$($inner.vectorize()),*].vectorize())
     };
 
     // rule, inner 省略
     (($s:expr, $e:expr)) => {
         Cst {
             rule: Rule::misc,
-            range: ($s, $e),
+            span: Span {start: $s, end: $e},
             inner: vec![]
         }
     };

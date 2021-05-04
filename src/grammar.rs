@@ -1,5 +1,6 @@
 use crate::cst;
 use crate::types::rule::Rule;
+use crate::types::Span;
 use crate::types::{Cst, Vectorize};
 
 /// 様々な型の変数をごちゃまぜに書くと、それをまとめて Vec<T> にしてくれる。
@@ -17,7 +18,7 @@ macro_rules! vectorize {
 }
 
 peg::parser! {
-    pub grammar satysfi_parser() for str {
+    grammar satysfi_parser() for str {
         use peg::ParseLiteral;
         // §1. common
 
@@ -566,15 +567,13 @@ peg::parser! {
         { cst!(variant_name (s, e)) }
 
         // §1. constants
-        pub rule constant() -> Cst =
-            inner:(
-                const_unit()
-                / const_bool()
-                / const_string()
-                / const_float()
-                / const_length()
-                / const_int())
-            { cst!(constant [inner]) }
+        rule constant() -> Cst =
+            const_unit()
+            / const_bool()
+            / const_string()
+            / const_float()
+            / const_length()
+            / const_int()
 
         pub rule const_unit() -> Cst =
             s:p() "(" _ ")" e:p() { cst!(const_unit (s, e)) }
@@ -729,11 +728,13 @@ peg::parser! {
         rule horizontal_list_inner() -> Cst = inner:horizontal_single() "|" {inner}
 
         pub rule horizontal_bullet_list() -> Cst =
-            inners:horizontal_bullet()+ { cst!(horizontal_bullet_list; inners) }
+            s:p() inners:horizontal_bullet()+ e:p() { cst!(horizontal_bullet_list (s, e) [inners]) }
 
         pub rule horizontal_bullet() -> Cst =
+            s:p()
             _ star:horizontal_bullet_star() _ single:horizontal_single() _
-            { cst!(horizontal_bullet [star, single]) }
+            e:p()
+            { cst!(horizontal_bullet (s, e) [star, single]) }
 
         pub rule horizontal_bullet_star() -> Cst =
             s:p() "*"+ e:p()
@@ -797,3 +798,5 @@ peg::parser! {
 
     }
 }
+
+pub use self::satysfi_parser::*;

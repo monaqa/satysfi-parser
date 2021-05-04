@@ -3,6 +3,7 @@ use std::path::PathBuf;
 use anyhow::Result;
 
 use peg::str::LineCol;
+use satysfi_parser::grammar;
 use satysfi_parser::CstText;
 
 use structopt::StructOpt;
@@ -16,7 +17,7 @@ fn main() -> Result<()> {
     let opts = Opts::from_args_safe()?;
     let text = std::fs::read_to_string(&opts.input)?;
 
-    let res = CstText::parse(&text, satysfi_parser::program);
+    let res = CstText::parse(&text, grammar::program);
 
     match res {
         Ok(csttext) => {

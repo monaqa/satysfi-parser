@@ -1,7 +1,7 @@
 use peg::str::LineCol;
 
 use super::Cst;
-use crate::grammar::satysfi_parser;
+use crate::grammar;
 
 macro_rules! make_rule {
     ( $($variant:ident,)* ) => {
@@ -14,7 +14,7 @@ macro_rules! make_rule {
         impl Rule {
             pub fn parse(&self, text: &str) -> Result<Cst, peg::error::ParseError<LineCol>> {
                 match self {
-                    $(Rule::$variant => satysfi_parser::$variant(&text)),*
+                    $(Rule::$variant => grammar::$variant(&text)),*
                 }
             }
         }
@@ -153,7 +153,6 @@ make_rule! {
     block_text_embedding,
 
     // constants
-    constant,
     const_unit,
     const_bool,
     const_int,

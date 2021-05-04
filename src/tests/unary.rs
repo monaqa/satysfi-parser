@@ -219,7 +219,7 @@ fn unary() {
     assert_parsed!("( + )" unary: ["+" bin_operator: [_]; ]);
     assert_parsed!("( |>)" unary: ["|>" bin_operator: [_]; ]);
     assert_parsed!("(1)" unary: ["1" expr: [_]; ]);
-    assert_parsed!("1" unary: ["1" constant: [_]; ]);
+    assert_parsed!("1" unary: ["1" const_int: [_]; ]);
     assert_parsed!("Mod.(1)" unary: ["Mod.(1)" expr_with_mod: [_];]);
     assert_parsed!("Mod.foo" unary: ["Mod.foo" modvar: [_];]);
     assert_parsed!("foo" unary: ["foo" var: [_];]);

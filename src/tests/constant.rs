@@ -70,8 +70,3 @@ fn const_string() {
     assert_not_parsed!("``` ``` ```" const_string: []);
     assert_not_parsed!("`` aaa ```" const_string: []);
 }
-
-#[test]
-fn constant() {
-    assert_parsed!("0pt" constant, const_length: []);
-}

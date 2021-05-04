@@ -9,7 +9,7 @@ fn variant_constructor() {
     ]);
     assert_parsed!("Some 1" variant_constructor: [
         "Some" variant_name: [];
-        "1" unary: ["1" constant, const_int: [];];
+        "1" unary, const_int: [];
     ]);
     assert_parsed!("Paper(100pt, 50pt)" variant_constructor: [
         "Paper" variant_name: [];

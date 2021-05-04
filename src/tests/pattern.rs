@@ -31,8 +31,8 @@ fn pat_variant() {
 fn pattern() {
     assert_parsed!("_" pattern: []);
     assert_parsed!("x" pattern, var: []);
-    assert_parsed!("1" pattern, constant, const_int: []);
-    assert_parsed!("1pt" pattern, constant, const_length: []);
+    assert_parsed!("1" pattern, const_int: []);
+    assert_parsed!("1pt" pattern, const_length: []);
 
     assert_parsed!("[x; y]" pattern, pat_list: [_]);
     assert_parsed!("(x)" pattern: ["x" pat_as: [_]; ]);
