@@ -5,7 +5,7 @@ use crate::grammar::satysfi_parser;
 
 macro_rules! make_rule {
     ( $($variant:ident,)* ) => {
-        #[derive(Debug, PartialEq, Eq, Clone, Copy)]
+        #[derive(Debug, PartialEq, Eq, Clone, Copy, Hash)]
         #[allow(non_camel_case_types)]
         pub enum Rule {
             $($variant),*
