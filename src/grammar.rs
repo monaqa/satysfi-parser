@@ -102,8 +102,8 @@ peg::parser! {
         // §1. statement
 
         pub rule preamble() -> Cst =
-            s:p() stmts:statement()+ e:p()
-        { cst!((s, e) [stmts]) }
+            s:p() stmts:(statement() ++ _) e:p()
+        { cst!(preamble (s, e) [stmts]) }
 
         #[cache]
         rule statement() -> Cst =
@@ -123,9 +123,9 @@ peg::parser! {
 
         rule let_stmt_argument() -> Vec<Cst> =
             // TODO: type_expr は本当は txfunc
-            s:p() ":" _ t:type_expr() _ "|" _ a:arg()+ e:p() { vectorize![t, a] }
+            s:p() ":" _ t:type_expr() _ "|" _ a:(arg() ++ _) e:p() { vectorize![t, a] }
             / s:p() ":" _ t:type_expr() e:p() { vectorize![t] }
-            / s:p() "|" _ a:arg()+ e:p() { vectorize![a] }
+            / s:p() "|"? _ a:(arg() ++ _) e:p() { vectorize![a] }
 
         pub rule let_rec_stmt() -> Cst =
             s:p() kwd("let-rec") _ inner:let_rec_inner() _ inners:(let_rec_inner() ** (_ kwd("and") _)) e:p()
@@ -139,17 +139,17 @@ peg::parser! {
         { cst!(let_rec_inner (s, e) [pat, arg, expr, arms]) }
 
         rule let_rec_stmt_argument() -> Vec<Cst> =
-            s:p() ":" _ t:type_expr() _ "|" _ a:arg()+ e:p() { vectorize![t, a] }
+            s:p() ":" _ t:type_expr() _ "|" _ a:(arg() ++ _) e:p() { vectorize![t, a] }
             / s:p() ":" _ t:type_expr() e:p() { vectorize![t] }
-            / s:p() a:arg()+ e:p() { vectorize![a] }
+            / s:p() a:(arg() ++ _) e:p() { vectorize![a] }
 
         pub rule let_rec_matcharm() -> Cst =
-            s:p() a:arg()* _ "=" _ expr:expr() e:p()
+            s:p() a:(arg() ** _) _ "=" _ expr:expr() e:p()
         { cst!(let_rec_matcharm (s, e) [a, expr]) }
 
         rule let_inline_stmt() -> Cst = let_inline_stmt_ctx() / let_inline_stmt_noctx()
         pub rule let_inline_stmt_ctx() -> Cst =
-            s:p() kwd("let-inline") _ ctx:var() _ cmd:inline_cmd_name() _ a:arg()* _ "=" _ expr:expr() e:p()
+            s:p() kwd("let-inline") _ ctx:var() _ cmd:inline_cmd_name() _ a:(arg() ** _) _ "=" _ expr:expr() e:p()
         { cst!(let_inline_stmt_ctx (s, e) [ctx, cmd, a, expr]) }
         pub rule let_inline_stmt_noctx() -> Cst =
             s:p() kwd("let-inline") _ cmd:inline_cmd_name() _ pat:pattern()* _ "=" _ expr:expr() e:p()
@@ -157,7 +157,7 @@ peg::parser! {
 
         rule let_block_stmt() -> Cst = let_block_stmt_ctx() / let_block_stmt_noctx()
         pub rule let_block_stmt_ctx() -> Cst =
-            s:p() kwd("let-block") _ ctx:var() _ cmd:block_cmd_name() _ a:arg()* _ "=" _ expr:expr() e:p()
+            s:p() kwd("let-block") _ ctx:var() _ cmd:block_cmd_name() _ a:(arg() ** _) _ "=" _ expr:expr() e:p()
         { cst!(let_block_stmt_ctx (s, e) [ctx, cmd, a, expr]) }
         pub rule let_block_stmt_noctx() -> Cst =
             s:p() kwd("let-block") _ cmd:block_cmd_name() _ pat:pattern()* _ "=" _ expr:expr() e:p()
@@ -172,18 +172,24 @@ peg::parser! {
         { cst!(let_mutable_stmt (s, e) [var, expr]) }
 
         pub rule type_stmt() -> Cst =
-            s:p() kwd("type") _ t:type_inner() _ ts:(type_inner() ** (_ kwd("and") _)) e:p()
-        { cst!(type_stmt (s, e) [t, ts]) }
+            s:p() kwd("type") _ ts:(type_inner() ++ (_ kwd("and") _)) e:p()
+        { cst!(type_stmt (s, e) [ts]) }
 
         pub rule type_inner() -> Cst =
             s:p()
-            tp:type_param()* _ t:type_name() _ "=" tvs:(type_variant() **  (_ "|" _)) _ c:constraint()*
+            tp:type_param()* _ t:type_name() _ "=" tvs:(_ "|" _ tv:type_variant() {tv})+ _ c:constraint()*
             e:p()
             { cst!(type_inner (s, e) [tp, t, tvs, c]) }
-            / s:p() tp:type_param()* _ t:type_name() _ "=" _ tvs:("|" _ tv:type_variant() {tv})+ _ c:constraint()* e:p()
+            /
+            s:p()
+            tp:type_param()* _ t:type_name() _ "=" _ tvs:(type_variant() ++  (_ "|" _)) _ c:constraint()*
+            e:p()
             { cst!(type_inner (s, e) [tp, t, tvs, c]) }
-            / s:p() tp:type_param()* _ tn:type_name() _ "=" _ te:type_expr() _ c:constraint()* e:p()
-            { cst!(type_inner (s, e) [tp, tn, te, c]) }
+            /
+            s:p()
+            tp:type_param()* _ t:type_name() _ "=" _ te:type_expr() _ c:constraint()*
+            e:p()
+            { cst!(type_inner (s, e) [tp, t, te, c]) }
 
         pub rule type_variant() -> Cst =
             s:p() v:variant_name() _ kwd("of") _ t:type_expr() e:p() { cst!(type_variant (s, e) [v, t]) }
@@ -205,82 +211,85 @@ peg::parser! {
             sig:(":" _ s:sig_stmt() {s})? _
             "=" _ stmt:struct_stmt()
             e:p()
-        { cst!((s, e) [n, sig, stmt]) }
+        { cst!(module_stmt (s, e) [n, sig, stmt]) }
 
-        rule sig_stmt() -> Cst =
+        pub rule sig_stmt() -> Cst =
             s:p() kwd("sig") _ inners:(sig_inner() ** _) _ kwd("end") e:p()
-        { cst!((s, e) [inners]) }
+        { cst!(sig_stmt (s, e) [inners]) }
 
-        rule struct_stmt() -> Cst =
+        pub rule struct_stmt() -> Cst =
             s:p() kwd("struct") _ stmts:(statement() ** _) _ kwd("end") e:p()
-        { cst!((s, e) [stmts]) }
+        { cst!(struct_stmt (s, e) [stmts]) }
 
         rule sig_inner() -> Cst = sig_type_stmt() / sig_val_stmt() / sig_direct_stmt()
 
-        rule sig_type_stmt() -> Cst =
+        pub rule sig_type_stmt() -> Cst =
             s:p() kwd("type") _ tps:(type_param() ** _) _ v:var() _ cs:(constraint() ** _) e:p()
-        { cst!((s, e) [tps, v, cs]) }
+        { cst!(sig_type_stmt (s, e) [tps, v, cs]) }
 
-        rule sig_val_stmt() -> Cst =
+        pub rule sig_val_stmt() -> Cst =
             s:p()
             kwd("val") _
             v:(var() / "(" _ b:bin_operator() _ ")" {b} / inline_cmd_name() / block_cmd_name()) _
             ":" _ t: type_expr() _ cs:(constraint() ** _)
             e:p()
-        { cst!((s, e) [v, t, cs]) }
+        { cst!(sig_val_stmt (s, e) [v, t, cs]) }
 
-        rule sig_direct_stmt() -> Cst =
+        pub rule sig_direct_stmt() -> Cst =
             s:p()
             kwd("direct") _
             cmd:(inline_cmd_name() / block_cmd_name()) _
             ":" _ t: type_expr() _ cs:(constraint() ** _)
             e:p()
-        { cst!((s, e) [cmd, t, cs]) }
+        { cst!(sig_direct_stmt (s, e) [cmd, t, cs]) }
 
         // §1. types
 
         pub rule type_expr() -> Cst =
             s:p()
-            typeopts:(t:type_optional() _ "?->" _ {t})* _
-            typeprods:(t:type_prod() _ "->" _ {t})* _
+            typeprods:(
+                t:type_optional() _ "?->" _ {t}
+                /
+                t:type_prod() _ "->" _ {t}
+            )* _
             typeprod:type_prod()
             e:p()
-        {
-            cst!(type_expr (s, e) [typeopts, typeprods, typeprod])
-        }
+        { cst!(type_expr (s, e) [typeprods, typeprod]) }
 
         pub rule type_optional() -> Cst = s:p() t:type_prod() e:p() { cst!(type_optional (s, e); t.inner) }
 
         pub rule type_prod() -> Cst =
             s:p() t:type_unary() ts:(_ "*" _ t:type_unary() {t})* e:p()
-        {
-            cst!(type_prod (s, e) [t, ts])
-        }
+        { cst!(type_prod (s, e) [t, ts]) }
 
         #[cache]
         rule type_unary() -> Cst =
-            t:type_list() _ kwd("inline-cmd") {t}
-            / t:type_list() _ kwd("block-cmd") {t}
-            / t:type_list() _ kwd("math-cmd") {t}
+            type_inline_cmd()
+            / type_block_cmd()
+            / type_math_cmd()
             / type_application()
             / "(" _ t:type_expr() _ ")" {t}
             / type_record()
             / type_param()
 
-        pub rule type_list() -> Cst =
-            s:p() "[" _ "]" e:p() { cst!((s, e)) }
+        pub rule type_inline_cmd() -> Cst = s:p() t:type_list() _ kwd("inline-cmd") e:p() { cst!(type_inline_cmd (s, e) [t]) }
+        pub rule type_block_cmd() -> Cst = s:p() t:type_list() _ kwd("block-cmd") e:p() { cst!(type_block_cmd (s, e) [t]) }
+        pub rule type_math_cmd() -> Cst = s:p() t:type_list() _ kwd("math-cmd") e:p() { cst!(type_math_cmd (s, e) [t]) }
+
+        rule type_list() -> Vec<Cst> =
+            s:p() "[" _ "]" e:p() { vec![] }
             / s:p() "[" _ t:type_list_unit()
                 ts:(_ ";" _ t:type_list_unit() {t})* _
                 ";"? _ "]" e:p()
-                { cst!(type_list (s, e) [t, ts]) }
+                { vectorize![t, ts] }
 
         rule type_list_unit() -> Cst =
-            t:type_list_unit_optional() _ "?" {t}
+            type_list_unit_optional()
             / type_expr()
 
         pub rule type_list_unit_optional() -> Cst =
-            s:p() t:type_prod() e:p()
-        { cst!(type_list_unit_optional (s, e); t.inner) }
+            s:p() t:type_prod() _ "?" e:p()
+        { cst!(type_list_unit_optional (s, e) [t]) }
 
         pub rule type_application() -> Cst =
             s:p() t:type_application_unit() _ ts:(type_application_unit()** _) e:p()
@@ -296,23 +305,19 @@ peg::parser! {
         { cst!(type_name (s, e) [t]) }
 
         pub rule type_record() -> Cst =
-            s:p() "(" _ "|" _ "|" _ ")" e:p() { cst!(type_record (s, e)) }
-            / s:p() "(" _ "|" _ t:type_record_inner() _ "|" _ ")" e:p() { cst!(type_record (s, e); t) }
-
-        rule type_record_inner() -> Vec<Cst> =
-            s:p() t:type_record_unit() _ ts:(type_record_unit() ** (_ ";" _)) _ ";"? e:p()
-        { vectorize![t, ts] }
+            s:p() "(|" _ "|)" e:p() { cst!(type_record (s, e)) }
+            / s:p() "(|" _ ts:(type_record_unit() ++ (_ ";" _)) _ ";"? _ "|)" e:p() { cst!(type_record (s, e) [ts]) }
 
         pub rule type_record_unit() -> Cst =
             s:p() v:var() _ ":" _ t:type_expr() e:p()
         { cst!(type_record_unit (s, e) [v, t]) }
 
         pub rule type_param() -> Cst =
-            s:p() "'" _ t:var_ptn() e:p()
+            s:p() "'" t:var_ptn() e:p()
         { cst!(type_param (s, e) [t]) }
 
         pub rule constraint() -> Cst =
-            s:p() kwd("constraint") t:type_param() _ "::" _ r:type_record() e:p()
+            s:p() kwd("constraint") _ t:type_param() _ "::" _ r:type_record() e:p()
         { cst!(constraint (s, e) [t, r]) }
 
         // §1. pattern
@@ -358,11 +363,11 @@ peg::parser! {
                 / assignment()
                 / dyadic_expr()
                 / unary_operator_expr()
-                / variant_constructor()
-                / application()
                 / command_application()
+                / application()
                 / record_member()
                 / unary()
+                / variant_constructor()
             ) e:p()
         { cst!(expr (s, e) [expr]) }
 
@@ -406,13 +411,13 @@ peg::parser! {
         { cst!(assignment (s, e) [v, expr]) }
 
         rule expr_inner_lambda() -> Cst =
-            dyadic_expr() / unary_operator_expr() / variant_constructor() / application() / unary()
+            dyadic_expr() / unary_operator_expr() / application() / unary() / variant_constructor()
 
         pub rule dyadic_expr() -> Cst =
             s:p()
-            t1:(unary_operator_expr() / variant_constructor() / application() / unary())
+            t1:(unary_operator_expr() / application() / unary() / variant_constructor())
             _ op:bin_operator()
-            _ t2:(dyadic_expr() / variant_constructor() / application() / unary())
+            _ t2:(dyadic_expr() / application() / unary() / variant_constructor())
             e:p()
         { cst!(dyadic_expr (s, e) [t1, op, t2]) }
 
@@ -426,7 +431,7 @@ peg::parser! {
 
         pub rule application() -> Cst =
             s:p()
-            v:(var() / modvar()) _
+            v:(record_member() / var() / modvar()) _
             args:(application_args() ++ _)
             e:p()
         { cst!(application (s, e) [v, args]) }
@@ -434,11 +439,11 @@ peg::parser! {
         rule application_args() -> Cst = application_args_optional() / application_args_normal()
 
         pub rule application_args_optional() -> Cst =
-            s:p() "?:" _ u:unary() e:p() { cst!(application_args_optional (s, e) [u]) }
+            s:p() "?:" _ u:(record_member() / unary()) e:p() { cst!(application_args_optional (s, e) [u]) }
             / s:p() "?*" e:p() { cst!(application_args_optional (s, e)) }
 
         pub rule application_args_normal() -> Cst =
-            s:p() u:(unary() / variant_name()) e:p()
+            s:p() u:(record_member() / unary() / variant_name()) e:p()
         { cst!(application_args_normal (s, e) [u]) }
 
         pub rule command_application() -> Cst =
@@ -457,7 +462,9 @@ peg::parser! {
 
         #[cache]
         pub rule unary() -> Cst =
-            s:p() body:(
+            s:p()
+            prefix:(p:unary_prefix() _ {p})?
+            body:(
                 block_text()
                 / horizontal_text()
                 / math_text()
@@ -470,8 +477,11 @@ peg::parser! {
                 / expr_with_mod()
                 / modvar()
                 / var()
-            ) e:p()
-        { cst!(unary (s, e) [body]) }
+            )
+            e:p()
+        { cst!(unary (s, e) [prefix, body]) }
+
+        pub rule unary_prefix() -> Cst = s:p() ("!" / "&" / "~") e:p() { cst!(unary_prefix (s, e)) }
 
         pub rule block_text() -> Cst =
             s:p() "'<" _ v:vertical() _ ">" e:p()
@@ -487,8 +497,8 @@ peg::parser! {
 
         pub rule record() -> Cst =
             s:p() "(|" _ "|)" e:p() { cst!(record (s, e)) }
-            / s:p() "(" _ "|" _ u:unary() _ kwd("with") _ i:record_inner() _ "|" _ ")" e:p() { cst!(record (s, e) [u, i]) }
-            / s:p() "(" _ "|" _ i:record_inner() _ "|" _ ")" e:p() { cst!(record (s, e) [i]) }
+            / s:p() "(|" _ u:unary() _ kwd("with") _ i:record_inner() _ "|)" e:p() { cst!(record (s, e) [u, i]) }
+            / s:p() "(|" _ i:record_inner() _ "|)" e:p() { cst!(record (s, e) [i]) }
 
         rule record_inner() -> Vec<Cst> =
             s:p() units:(record_unit() ++ (_ ";" _)) _ ";"? e:p()
@@ -586,7 +596,7 @@ peg::parser! {
             s:p() length_digit() length_unit() e:p()
             { cst!(const_length (s, e)) }
 
-        rule length_digit() = "-"? (const_float_inner() / const_int_decimal())
+        rule length_digit() = "-"? (const_float_inner() / const_int_decimal() / "0")
         rule length_unit() = ['a'..='z'] ['0'..='9' | 'a'..='z' | 'A' ..='Z' | '-']*
 
         pub rule const_string() -> Cst =

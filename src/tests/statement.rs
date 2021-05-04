@@ -1,7 +1,6 @@
 use super::*;
 
 #[test]
-fn let_stmt() {
-    // assert_parsed!("let a = 1" let_stmt: [_]);
-    // assert_not_parsed!("leta = 1" let_stmt: []);
+fn type_inner() {
+    assert_parsed!("a = int" type_inner: ["a" type_name: [_]; "int" type_expr: [_]; ]);
 }

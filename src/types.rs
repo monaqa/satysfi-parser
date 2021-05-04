@@ -1,3 +1,5 @@
+use std::fmt::Display;
+
 use self::rule::Rule;
 
 pub trait Vectorize<T> {
@@ -79,6 +81,34 @@ impl CstText {
         let text = self.text.as_str();
         let (s, e) = cst.range;
         &text[s..e]
+    }
+}
+
+impl Display for CstText {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        fn print_cst(text: &str, cst: &Cst, indent: usize) -> String {
+            let mut s = String::new();
+
+            s.push_str(&"  ".repeat(indent));
+            s.push_str(&format!("[{:?}]", cst.rule));
+
+            // 長すぎないものだけテキストを表示
+            let (start, end) = cst.range;
+            let slice = &text[start..end];
+            if !slice.contains('\n') && slice.len() < 80 {
+                s.push_str(&format!(": \"{}\"", slice));
+            }
+
+            s.push('\n');
+
+            for child in &cst.inner {
+                s.push_str(&print_cst(text, child, indent + 1))
+            }
+            s
+        }
+
+        let text = print_cst(&self.text, &self.cst, 0);
+        write!(f, "{}", text)
     }
 }
 

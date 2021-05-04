@@ -103,6 +103,7 @@ fn tuple() {
     assert_parsed!("(1, 2)" tuple: [ "1" expr: [_]; "2" expr: [_]; ]);
     assert_parsed!("(1,\n2)" tuple: [ "1" expr: [_]; "2" expr: [_]; ]);
     assert_parsed!("(1, 2, 3)" tuple: [ "1" expr: [_]; "2" expr: [_]; "3" expr: [_]; ]);
+    assert_parsed!("(0pt, 0pt -' dp)" tuple: [_]);
     // TODO: もっと複雑な expr（途中でカンマが出てくるような）
 
     assert_not_parsed!("(1)" tuple: [_]);
@@ -210,6 +211,7 @@ fn unary() {
     assert_parsed!("(||)" unary: ["(||)" record: [_]; ]);
     assert_parsed!("[]" unary: ["[]" list: [_]; ]);
     assert_parsed!("(1, 2)" unary: ["(1, 2)" tuple: [_]; ]);
+    assert_parsed!("0pt" unary: [_]);
 
     assert_parsed!("(+)" unary: ["+" bin_operator: [_]; ]);
     assert_parsed!("( + )" unary: ["+" bin_operator: [_]; ]);

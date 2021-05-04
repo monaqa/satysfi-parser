@@ -30,6 +30,7 @@ make_rule! {
 
     program_saty,
     program_satyh,
+    preamble,
 
     // header
     stage,
@@ -56,11 +57,20 @@ make_rule! {
     open_stmt,
     arg,
 
+    // struct
+    sig_stmt,
+    struct_stmt,
+    sig_type_stmt,
+    sig_val_stmt,
+    sig_direct_stmt,
+
     // types
     type_expr,
     type_optional,
     type_prod,
-    type_list,
+    type_inline_cmd,
+    type_block_cmd,
+    type_math_cmd,
     type_list_unit_optional,
     type_application,
     type_name,
@@ -99,6 +109,7 @@ make_rule! {
 
     // unary
     unary,
+    unary_prefix,
     block_text,
     horizontal_text,
     math_text,

@@ -41,6 +41,7 @@ fn application_args_normal() {
     assert_parsed!("1" application_args_normal: ["1" unary: [_]; ]);
     assert_parsed!("foo" application_args_normal: ["foo" unary: [_]; ]);
     assert_parsed!("None" application_args_normal: ["None" variant_name: [_]; ]);
+    assert_parsed!("(Gr.line pt1 pt2)" application_args_normal: [_]);
 }
 
 #[test]
@@ -68,6 +69,7 @@ fn application() {
         "Mod.foo" modvar: [_];
         "bar" application_args_normal: [_];
     ]);
+    assert_parsed!("stroke lwid clr (Gr.line pt1 pt2)" application: [_]);
 }
 
 #[test]
@@ -196,4 +198,11 @@ fn match_expr() {
         "Some(x) -> x" match_arm: [_];
         "None -> 1" match_arm: [_];
     ]);
+}
+
+#[test]
+fn expr() {
+    assert_parsed!("Gr.line pt1 pt2" expr: [_]);
+    assert_parsed!("0pt" expr: [_]);
+    assert_parsed!("(!toc-acc-ref) |> List.reverse |> List.fold-left" expr: [_]);
 }
