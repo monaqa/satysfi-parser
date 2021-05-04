@@ -61,6 +61,19 @@ pub struct Span {
     pub end: usize,
 }
 
+impl Span {
+    /// span が特定の位置を含んでいるか。
+    pub fn includes(&self, pos: usize) -> bool {
+        self.start <= pos && pos < self.end
+    }
+
+    /// span が特定のspanを完全に内部に含んでいるか。
+    pub fn contains(&self, other: &Span) -> bool {
+        self.start <= other.start && other.end <= self.end
+    }
+}
+
+/// コードを line & column 形式 (0-index) で指定したもの。
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct LineCol {
     pub line: usize,
@@ -112,32 +125,73 @@ impl CstText {
         let column = pos - self.lines[line];
         Some(LineCol { line, column })
     }
-}
 
-impl Display for CstText {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        fn print_cst(text: &str, cst: &Cst, indent: usize) -> String {
+    /// 与えられた line 及び col の position を出力する。
+    pub fn from_line_col(&self, line: usize, column: usize) -> Option<usize> {
+        let idxline = self.lines.get(line)?;
+        let max_idx = match self.lines.get(line + 1) {
+            Some(idx) => *idx,
+            None => self.text.len(),
+        };
+        if (*idxline + column) < max_idx {
+            Some(*idxline + column)
+        } else {
+            None
+        }
+    }
+
+    /// CST の構造を string にして出力する。
+    pub fn pritty_cst_recursive(&self, cst: &Cst) -> String {
+        fn print_cst(csttext: &CstText, cst: &Cst, indent: usize) -> String {
             let mut s = String::new();
 
             s.push_str(&"  ".repeat(indent));
-            s.push_str(&format!("[{:?}]", cst.rule));
-
-            // 長すぎないものだけテキストを表示
-            let Span { start, end } = cst.span;
-            let slice = &text[start..end];
-            if !slice.contains('\n') && slice.len() < 80 {
-                s.push_str(&format!(": \"{}\"", slice));
-            }
-
+            s.push_str(&csttext.pritty_cst(cst));
             s.push('\n');
 
             for child in &cst.inner {
-                s.push_str(&print_cst(text, child, indent + 1))
+                s.push_str(&print_cst(csttext, child, indent + 1))
             }
             s
         }
 
-        let text = print_cst(&self.text, &self.cst, 0);
+        print_cst(&self, cst, 0)
+    }
+
+    /// Cst を pritty 表示。
+    pub fn pritty_cst(&self, cst: &Cst) -> String {
+        let mut s = String::new();
+        s.push_str(&format!("[{:?}]", cst.rule));
+
+        // 長すぎないものだけテキストを表示
+        let Span { start, end } = cst.span;
+        let slice = &self.text[start..end];
+        if !slice.contains('\n') && slice.len() < 80 {
+            s.push_str(&format!(": \"{}\"", slice));
+        } else {
+            let LineCol {
+                line: start_line,
+                column: start_column,
+            } = self.get_line_col(start).unwrap();
+            let LineCol {
+                line: end_line,
+                column: end_column,
+            } = self.get_line_col(end).unwrap();
+            s.push_str(&format!(
+                " (L{}-C{} .. L{}-C{})",
+                start_line + 1,
+                start_column + 1,
+                end_line + 1,
+                end_column + 1
+            ));
+        }
+        s
+    }
+}
+
+impl Display for CstText {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let text = self.pritty_cst_recursive(&self.cst);
         write!(f, "{}", text)
     }
 }
@@ -167,6 +221,74 @@ impl Cst {
     pub fn as_str<'a>(&'a self, text: &'a str) -> &'a str {
         let Span { start, end } = self.span;
         &text[start..end]
+    }
+
+    /// 与えられたルールの Cst を再帰的に抽出する。
+    pub fn pickup(&self, rule: Rule) -> Vec<&Cst> {
+        let mut vec = vec![];
+        for cst in &self.inner {
+            if cst.rule == rule {
+                vec.push(cst)
+            }
+            let v = cst.pickup(rule);
+            vec.extend(v);
+        }
+        vec
+    }
+
+    /// 自分の子のうち、与えられた pos を含むものを返す。
+    pub fn choose(&self, pos: usize) -> Option<&Cst> {
+        for cst in &self.inner {
+            if cst.span.includes(pos) {
+                return Some(cst);
+            }
+        }
+        None
+    }
+
+    /// 与えられた pos を含む Pair を再帰的に探索する。
+    pub fn dig(&self, pos: usize) -> Vec<&Cst> {
+        let child = self.choose(pos);
+        if let Some(child) = child {
+            let mut v = child.dig(pos);
+            v.push(child);
+            v
+        } else {
+            vec![]
+        }
+    }
+
+    // pub fn mode(&self, pos: &Position) -> Mode {
+    //     let csts = self.dig(pos);
+    //     let rules = csts.iter().map(|cst| cst.rule);
+    //
+    //     for rule in rules {
+    //         match rule {
+    //             Rule::vertical_mode => return Mode::Vertical,
+    //             Rule::horizontal_mode => return Mode::Horizontal,
+    //             Rule::math_mode => return Mode::Math,
+    //             Rule::headers | Rule::header_stage => return Mode::Header,
+    //             Rule::COMMENT => return Mode::Comment,
+    //             Rule::string_interior => return Mode::Literal,
+    //             Rule::cmd_expr_arg
+    //             | Rule::cmd_expr_option
+    //             | Rule::math_cmd_expr_arg
+    //             | Rule::math_cmd_expr_option => return Mode::Program,
+    //             _ => continue,
+    //         }
+    //     }
+    //     Mode::Program
+    // }
+
+    /// 自身及び子要素の Cst を羅列する。
+    pub fn listup(&self) -> Vec<&Cst> {
+        let mut v = vec![];
+        v.push(self);
+        for cst in &self.inner {
+            let inner = cst.listup();
+            v.extend(inner);
+        }
+        v
     }
 }
 
