@@ -212,6 +212,8 @@ fn unary() {
     assert_parsed!("[]" unary: ["[]" list: [_]; ]);
     assert_parsed!("(1, 2)" unary: ["(1, 2)" tuple: [_]; ]);
     assert_parsed!("0pt" unary: [_]);
+    assert_parsed!("foo#bar" unary: ["foo" var: []; "bar" var: [];]);
+    assert_parsed!("foo # bar" unary: ["foo" var: []; "bar" var: [];]);
 
     assert_parsed!("(+)" unary: ["+" bin_operator: [_]; ]);
     assert_parsed!("( + )" unary: ["+" bin_operator: [_]; ]);

@@ -104,7 +104,6 @@ make_rule! {
     application_args_normal,
     application_args_optional,
     command_application,
-    record_member,
     variant_constructor,
 
     // unary

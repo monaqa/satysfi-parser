@@ -22,11 +22,11 @@ fn variant_constructor() {
     assert_not_parsed!("Variant 1 2" variant_constructor: [_]);
 }
 
-#[test]
-fn record_member() {
-    assert_parsed!("foo#bar" record_member: ["foo" unary, var: []; "bar" var: []; ]);
-    assert_parsed!("foo # bar" record_member: ["foo" unary, var: []; "bar" var: []; ]);
-}
+// #[test]
+// fn record_member() {
+//     assert_parsed!("foo#bar" record_member: ["foo" unary, var: []; "bar" var: []; ]);
+//     assert_parsed!("foo # bar" record_member: ["foo" unary, var: []; "bar" var: []; ]);
+// }
 
 #[test]
 fn command_application() {

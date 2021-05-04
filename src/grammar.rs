@@ -365,7 +365,6 @@ peg::parser! {
                 / unary_operator_expr()
                 / command_application()
                 / application()
-                / record_member()
                 / unary()
                 / variant_constructor()
             ) e:p()
@@ -422,7 +421,7 @@ peg::parser! {
         { cst!(dyadic_expr (s, e) [t1, op, t2]) }
 
         pub rule unary_operator_expr() -> Cst =
-            s:p() op:unary_operator() _ expr:(application() / record_member() / unary()) e:p()
+            s:p() op:unary_operator() _ expr:(application() / unary()) e:p()
         { cst!(unary_operator_expr (s, e) [op, expr]) }
 
         pub rule unary_operator() -> Cst =
@@ -431,7 +430,7 @@ peg::parser! {
 
         pub rule application() -> Cst =
             s:p()
-            v:(record_member() / var() / modvar()) _
+            v:(var() / modvar()) _
             args:(application_args() ++ _)
             e:p()
         { cst!(application (s, e) [v, args]) }
@@ -439,20 +438,16 @@ peg::parser! {
         rule application_args() -> Cst = application_args_optional() / application_args_normal()
 
         pub rule application_args_optional() -> Cst =
-            s:p() "?:" _ u:(record_member() / unary()) e:p() { cst!(application_args_optional (s, e) [u]) }
+            s:p() "?:" _ u:(unary()) e:p() { cst!(application_args_optional (s, e) [u]) }
             / s:p() "?*" e:p() { cst!(application_args_optional (s, e)) }
 
         pub rule application_args_normal() -> Cst =
-            s:p() u:(record_member() / unary() / variant_name()) e:p()
+            s:p() u:(unary() / variant_name()) e:p()
         { cst!(application_args_normal (s, e) [u]) }
 
         pub rule command_application() -> Cst =
             s:p() kwd("command") _ n:inline_cmd_name() e:p()
         { cst!(command_application (s, e) [n]) }
-
-        pub rule record_member() -> Cst =
-            s:p() u:unary() _ "#" _ v:var() e:p()
-        { cst!(record_member (s, e) [u, v]) }
 
         pub rule variant_constructor() -> Cst =
             s:p() v:variant_name() _ u:unary()? e:p()
@@ -464,7 +459,7 @@ peg::parser! {
         pub rule unary() -> Cst =
             s:p()
             prefix:(p:unary_prefix() _ {p})?
-            body:(
+            body:((
                 block_text()
                 / horizontal_text()
                 / math_text()
@@ -477,7 +472,7 @@ peg::parser! {
                 / expr_with_mod()
                 / modvar()
                 / var()
-            )
+            ) ++ (_ "#" _))
             e:p()
         { cst!(unary (s, e) [prefix, body]) }
 
