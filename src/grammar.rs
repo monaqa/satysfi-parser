@@ -136,7 +136,12 @@ peg::parser! {
             pat:pattern() _ arg:let_rec_stmt_argument()? _ "=" _ expr:expr()
             _ arms:("|" _ arm:let_rec_matcharm() _ {arm})*
             e:p()
-        { cst!(let_rec_inner (s, e) [pat, arg, expr, arms]) }
+            { cst!(let_rec_inner (s, e) [pat, arg, expr, arms]) }
+            /
+            s:p()
+            pat:pattern() _ arms:("|" _ arm:let_rec_matcharm() _ {arm})*
+            e:p()
+            { cst!(let_rec_inner (s, e) [pat, arms]) }
 
         rule let_rec_stmt_argument() -> Vec<Cst> =
             s:p() ":" _ t:type_expr() _ "|" _ a:(arg() ++ _) e:p() { vectorize![t, a] }
@@ -152,7 +157,7 @@ peg::parser! {
             s:p() kwd("let-inline") _ ctx:var() _ cmd:inline_cmd_name() _ a:(arg() ** _) _ "=" _ expr:expr() e:p()
         { cst!(let_inline_stmt_ctx (s, e) [ctx, cmd, a, expr]) }
         pub rule let_inline_stmt_noctx() -> Cst =
-            s:p() kwd("let-inline") _ cmd:inline_cmd_name() _ pat:pattern()* _ "=" _ expr:expr() e:p()
+            s:p() kwd("let-inline") _ cmd:inline_cmd_name() _ pat:(pattern() ** _) _ "=" _ expr:expr() e:p()
         { cst!(let_inline_stmt_noctx (s, e) [cmd, pat, expr]) }
 
         rule let_block_stmt() -> Cst = let_block_stmt_ctx() / let_block_stmt_noctx()
@@ -160,12 +165,12 @@ peg::parser! {
             s:p() kwd("let-block") _ ctx:var() _ cmd:block_cmd_name() _ a:(arg() ** _) _ "=" _ expr:expr() e:p()
         { cst!(let_block_stmt_ctx (s, e) [ctx, cmd, a, expr]) }
         pub rule let_block_stmt_noctx() -> Cst =
-            s:p() kwd("let-block") _ cmd:block_cmd_name() _ pat:pattern()* _ "=" _ expr:expr() e:p()
+            s:p() kwd("let-block") _ cmd:block_cmd_name() _ pat:(pattern() ** _) _ "=" _ expr:expr() e:p()
         { cst!(let_block_stmt_noctx (s, e) [cmd, pat, expr]) }
 
         pub rule let_math_stmt() -> Cst =
-            s:p() kwd("let-math") _ cmd:math_cmd_name() _ pat:pattern()* _ "=" _ expr:expr() e:p()
-        { cst!(let_math_stmt (s, e) [cmd, pat, expr]) }
+            s:p() kwd("let-math") _ cmd:math_cmd_name() _ a:(arg() ** _) _ "=" _ expr:expr() e:p()
+        { cst!(let_math_stmt (s, e) [cmd, a, expr]) }
 
         pub rule let_mutable_stmt() -> Cst =
             s:p() kwd("let-mutable") _ var:var() _ "<-" _ expr:expr() e:p()
