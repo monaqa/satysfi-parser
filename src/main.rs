@@ -30,6 +30,10 @@ fn main() -> Result<()> {
                     .from_line_col(line - 1, column - 1)
                     .expect("invalid line/column number.");
                 let csts = csttext.cst.dig(pos);
+
+                println!("Cuurent mode: {:?}", csttext.cst.mode(pos));
+                println!();
+
                 for cst in csts.iter().rev() {
                     let text = csttext.pritty_cst(cst);
                     println!("{}", text);

@@ -1,5 +1,7 @@
 use std::fmt::Display;
 
+use crate::Mode;
+
 use self::rule::Rule;
 
 pub trait Vectorize<T> {
@@ -258,27 +260,17 @@ impl Cst {
         }
     }
 
-    // pub fn mode(&self, pos: &Position) -> Mode {
-    //     let csts = self.dig(pos);
-    //     let rules = csts.iter().map(|cst| cst.rule);
-    //
-    //     for rule in rules {
-    //         match rule {
-    //             Rule::vertical_mode => return Mode::Vertical,
-    //             Rule::horizontal_mode => return Mode::Horizontal,
-    //             Rule::math_mode => return Mode::Math,
-    //             Rule::headers | Rule::header_stage => return Mode::Header,
-    //             Rule::COMMENT => return Mode::Comment,
-    //             Rule::string_interior => return Mode::Literal,
-    //             Rule::cmd_expr_arg
-    //             | Rule::cmd_expr_option
-    //             | Rule::math_cmd_expr_arg
-    //             | Rule::math_cmd_expr_option => return Mode::Program,
-    //             _ => continue,
-    //         }
-    //     }
-    //     Mode::Program
-    // }
+    pub fn mode(&self, pos: usize) -> Mode {
+        let csts = self.dig(pos);
+        let rules = csts.iter().map(|cst| cst.rule);
+
+        for rule in rules {
+            if let Some(mode) = rule.mode() {
+                return mode;
+            }
+        }
+        Mode::Program
+    }
 
     /// 自身及び子要素の Cst を羅列する。
     pub fn listup(&self) -> Vec<&Cst> {

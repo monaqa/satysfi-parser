@@ -169,3 +169,136 @@ make_rule! {
     math_unary,
     math_embedding,
 }
+
+#[derive(Debug, Clone)]
+pub enum Mode {
+    /// プログラムモード
+    Program,
+    /// プログラムモードのうち、型を記述する箇所
+    ProgramType,
+    /// 垂直モード
+    Vertical,
+    /// 水平モード
+    Horizontal,
+    /// 数式モード
+    Math,
+    /// ヘッダ
+    Header,
+    /// アクティブモード（コマンドの式引数）
+    Active,
+    /// リテラル
+    Literal,
+    /// コメント（不使用）
+    Comment,
+}
+
+impl Rule {
+    /// Mode が一意に定まるときは Mode を出力する。
+    /// たとえば horizontal_single であれば水平モードであることが分かるため
+    /// Some(Mode::Horizontal) を出力するが、
+    /// var_ptn であれば不明のため None を返す。
+    pub fn mode(&self) -> Option<Mode> {
+        let mode = match self {
+            Rule::stage
+            | Rule::headers
+            | Rule::header_require
+            | Rule::header_import
+            | Rule::pkgname => Mode::Header,
+
+            Rule::let_stmt
+            | Rule::let_rec_stmt
+            | Rule::let_rec_inner
+            | Rule::let_rec_matcharm
+            | Rule::let_inline_stmt_ctx
+            | Rule::let_inline_stmt_noctx
+            | Rule::let_block_stmt_ctx
+            | Rule::let_block_stmt_noctx
+            | Rule::let_math_stmt
+            | Rule::let_mutable_stmt
+            | Rule::type_stmt
+            | Rule::module_stmt
+            | Rule::open_stmt
+            | Rule::arg
+            | Rule::pat_as
+            | Rule::pat_cons
+            | Rule::pattern
+            | Rule::pat_variant
+            | Rule::pat_list
+            | Rule::pat_tuple
+            | Rule::expr
+            | Rule::match_expr
+            | Rule::match_arm
+            | Rule::match_guard
+            | Rule::bind_stmt
+            | Rule::ctrl_while
+            | Rule::ctrl_if
+            | Rule::lambda
+            | Rule::assignment
+            | Rule::dyadic_expr
+            | Rule::unary_operator_expr
+            | Rule::unary_operator
+            | Rule::application
+            | Rule::application_args_normal
+            | Rule::application_args_optional
+            | Rule::command_application
+            | Rule::variant_constructor
+            | Rule::unary
+            | Rule::unary_prefix
+            | Rule::list
+            | Rule::record
+            | Rule::record_unit
+            | Rule::tuple
+            | Rule::bin_operator
+            | Rule::expr_with_mod
+            | Rule::mod_cmd_name
+            | Rule::module_name
+            | Rule::variant_name => Mode::Program,
+
+            Rule::sig_stmt
+            | Rule::type_inner
+            | Rule::type_variant
+            | Rule::sig_type_stmt
+            | Rule::sig_val_stmt
+            | Rule::sig_direct_stmt
+            | Rule::type_expr
+            | Rule::type_optional
+            | Rule::type_prod
+            | Rule::type_inline_cmd
+            | Rule::type_block_cmd
+            | Rule::type_math_cmd
+            | Rule::type_list_unit_optional
+            | Rule::type_application
+            | Rule::type_name
+            | Rule::type_record
+            | Rule::type_record_unit
+            | Rule::type_param
+            | Rule::constraint => Mode::ProgramType,
+
+            Rule::horizontal_single
+            | Rule::horizontal_list
+            | Rule::horizontal_bullet_list
+            | Rule::horizontal_bullet
+            | Rule::regular_text
+            | Rule::horizontal_escaped_char => Mode::Horizontal,
+
+            Rule::vertical => Mode::Vertical,
+
+            Rule::const_unit
+            | Rule::const_bool
+            | Rule::const_int
+            | Rule::const_float
+            | Rule::const_length
+            | Rule::const_string => Mode::Literal,
+
+            Rule::math_single
+            | Rule::math_list
+            | Rule::math_token
+            | Rule::math_sup
+            | Rule::math_sub
+            | Rule::math_unary => Mode::Math,
+
+            _ => return None,
+        };
+        Some(mode)
+    }
+}
