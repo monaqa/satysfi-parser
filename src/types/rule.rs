@@ -168,9 +168,16 @@ make_rule! {
     math_sub,
     math_unary,
     math_embedding,
+
+    // dummy
+    dummy_header,
+    dummy_sig_stmt,
+    dummy_stmt,
+    dummy_inline_cmd_incomplete,
+    dummy_block_cmd_incomplete,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Mode {
     /// プログラムモード
     Program,
@@ -184,8 +191,6 @@ pub enum Mode {
     Math,
     /// ヘッダ
     Header,
-    /// アクティブモード（コマンドの式引数）
-    Active,
     /// リテラル
     Literal,
     /// コメント（不使用）
@@ -203,6 +208,7 @@ impl Rule {
             | Rule::headers
             | Rule::header_require
             | Rule::header_import
+            | Rule::dummy_header
             | Rule::pkgname => Mode::Header,
 
             Rule::let_stmt
@@ -218,6 +224,7 @@ impl Rule {
             | Rule::type_stmt
             | Rule::module_stmt
             | Rule::open_stmt
+            | Rule::dummy_stmt
             | Rule::arg
             | Rule::pat_as
             | Rule::pat_cons
@@ -255,6 +262,7 @@ impl Rule {
             | Rule::variant_name => Mode::Program,
 
             Rule::sig_stmt
+            | Rule::dummy_sig_stmt
             | Rule::type_inner
             | Rule::type_variant
             | Rule::sig_type_stmt
@@ -300,5 +308,25 @@ impl Rule {
             _ => return None,
         };
         Some(mode)
+    }
+
+    pub fn is_error(&self) -> bool {
+        self.error_description().is_some()
+    }
+
+    pub fn error_description(&self) -> Option<String> {
+        let text = match self {
+            Rule::dummy_header => "Missing Package name.",
+            Rule::dummy_stmt => "Missing definition of the statement.",
+            Rule::dummy_sig_stmt => "Incomplete signature syntax.",
+            Rule::dummy_inline_cmd_incomplete => {
+                "Incomplete inline command.\nTry adding semicolon or arguments after the command name."
+            }
+            Rule::dummy_block_cmd_incomplete => {
+                "Incomplete block command.\nTry adding semicolon or arguments after the command name."
+            }
+            _ => return None,
+        };
+        Some(text.to_owned())
     }
 }

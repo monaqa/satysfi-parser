@@ -87,7 +87,7 @@ peg::parser! {
             s:p() v:(h: header() _ {h})* e:p()
         { cst!(headers (s, e); v) }
 
-        rule header() -> Cst = header_require() / header_import()
+        rule header() -> Cst = header_require() / header_import() / dummy_header()
 
         pub rule header_require() -> Cst =
             s:p() "@require:" [' ' | '\t']* pkg:pkgname() ['\n' | '\r'] e:p()
@@ -96,6 +96,16 @@ peg::parser! {
         pub rule header_import() -> Cst =
             s:p() "@import:" [' ' | '\t']* pkg:pkgname() ['\n' | '\r'] e:p()
         { cst!(header_import (s, e) [pkg]) }
+
+        pub rule dummy_header() -> Cst =
+            s:p()
+            (
+                ("@require:" / "@import") [' ' | '\t']* ['\n' | '\r']
+                / "@" var_ptn() ['\n' | '\r']
+                / "@" ['\n' | '\r']
+            )
+            e:p()
+        { cst!(dummy_header (s, e)) }
 
         pub rule pkgname() -> Cst =
             s:p() NON_LF()+ e:p()
@@ -118,6 +128,7 @@ peg::parser! {
             / type_stmt()
             / module_stmt()
             / open_stmt()
+            / dummy_stmt()
 
         pub rule let_stmt() -> Cst =
             s:p() kwd("let") _ pat:pattern() _ arg:let_stmt_argument()? _ "=" _ expr:expr() e:p()
@@ -206,6 +217,12 @@ peg::parser! {
             s:p() kwd("open") _ m:module_name() e:p()
         { cst!(open_stmt (s, e) [m]) }
 
+        pub rule dummy_stmt() -> Cst =
+            s:p()
+            (kwd("let") / kwd("module") / kwd("type")) _ var() ** _
+            e:p()
+        { cst!(dummy_stmt (s, e)) }
+
         pub rule arg() -> Cst =
             s:p() p:pattern() e:p() { cst!(arg (s, e) [p]) }
             / s:p() "?:" _ p:var_ptn() e:p() { cst!(arg (s, e) [p]) }
@@ -228,7 +245,7 @@ peg::parser! {
             s:p() kwd("struct") _ stmts:(statement() ** _) _ kwd("end") e:p()
         { cst!(struct_stmt (s, e) [stmts]) }
 
-        rule sig_inner() -> Cst = sig_type_stmt() / sig_val_stmt() / sig_direct_stmt()
+        rule sig_inner() -> Cst = sig_type_stmt() / sig_val_stmt() / sig_direct_stmt() / dummy_sig_stmt()
 
         pub rule sig_type_stmt() -> Cst =
             s:p() kwd("type") _ tps:(type_param() ** _) _ v:var() _ cs:(constraint() ** _) e:p()
@@ -249,6 +266,12 @@ peg::parser! {
             ":" _ t: type_expr() _ cs:(constraint() ** _)
             e:p()
         { cst!(sig_direct_stmt (s, e) [cmd, t, cs]) }
+
+        pub rule dummy_sig_stmt() -> Cst =
+            s:p()
+            !kwd("end") _ var_ptn()
+            e:p()
+        { cst!(dummy_sig_stmt (s, e)) }
 
         // §1. types
 
@@ -707,6 +730,7 @@ peg::parser! {
             / math_text()
             / horizontal_escaped_char()
             / regular_text()
+            / dummy_inline_cmd_incomplete()
 
         pub rule inline_text_embedding() -> Cst =
             s:p() "#" inner:(var_ptn() / modvar()) _ ";" e:p()
@@ -715,6 +739,12 @@ peg::parser! {
         pub rule regular_text() -> Cst =
             s:p() $(!horizontal_special_char() [_])+ e:p()
         { cst!(regular_text (s, e)) }
+
+        pub rule dummy_inline_cmd_incomplete() -> Cst =
+            s:p()
+            "\\" (var_ptn() / modvar())?
+            e:p()
+        { cst!(dummy_inline_cmd_incomplete (s, e)) }
 
         pub rule horizontal_escaped_char() -> Cst =
             s:p() "\\" horizontal_special_char() e:p()
@@ -747,11 +777,17 @@ peg::parser! {
             s:p() vs:(vertical_element() ** _) e:p()
         { cst!(vertical (s, e) [vs]) }
 
-        rule vertical_element() -> Cst = block_cmd() / block_text_embedding()
+        rule vertical_element() -> Cst = block_cmd() / block_text_embedding() / dummy_block_cmd_incomplete()
 
         pub rule block_text_embedding() -> Cst =
             s:p() "#" inner:(var_ptn() / modvar()) _ ";" e:p()
         { cst!(block_text_embedding (s, e) [inner]) }
+
+        pub rule dummy_block_cmd_incomplete() -> Cst =
+            s:p()
+            "\\" (var_ptn() / modvar())?
+            e:p()
+        { cst!(dummy_block_cmd_incomplete (s, e)) }
 
         // §1. math mode
 
