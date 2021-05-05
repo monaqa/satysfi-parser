@@ -44,10 +44,15 @@ fn main() -> Result<()> {
         }
         Err(err) => {
             let filename = opts.input.to_string_lossy();
-            let LineCol { line, column, .. } = err.location;
-            let expected = err.expected;
-            eprintln!("[Parse Error] {}:{}:{}", filename, line, column);
-            eprintln!("Expected: {:?}", expected);
+            let (lc, tokens) = err;
+            eprintln!(
+                "[Parse Error] {}:{}:{}",
+                filename,
+                lc.line + 1,
+                lc.column + 1
+            );
+            eprintln!("Expected:");
+            tokens.into_iter().for_each(|s| eprintln!("  {}", s));
         }
     }
 

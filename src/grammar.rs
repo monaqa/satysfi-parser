@@ -38,8 +38,8 @@ peg::parser! {
         rule NON_LF() = !['\r' | '\n'] [_]
 
         /// constants
-        rule ASCII_DIGIT() = ['0'..='9']
-        rule ASCII_ALPHANUMERIC_HYPHEN() = ['a'..='z' | 'A'..='Z' | '0'..='9' | '-']
+        rule ASCII_DIGIT() = quiet!{['0'..='9']} / expected!("number")
+        rule ASCII_ALPHANUMERIC_HYPHEN() = quiet!{['a'..='z' | 'A'..='Z' | '0'..='9' | '-']} / expected!("alphabet, number, or hyphen")
 
         /// keywords
         /// 例えば kwd("let") とすると、

@@ -75,7 +75,7 @@ impl Span {
     }
 }
 
-/// コードを line & column 形式 (0-index) で指定したもの。
+/// コードを line & column 形式 (0-indexed) で指定したもの。
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct LineCol {
     pub line: usize,
@@ -93,19 +93,31 @@ pub struct CstText {
 
 impl CstText {
     /// 与えられたパーサに基づき、与えられたテキストをパースする。
-    pub fn parse<F, E: std::error::Error>(text: &str, parser: F) -> std::result::Result<Self, E>
+    pub fn parse<F>(
+        text: &str,
+        parser: F,
+    ) -> std::result::Result<Self, (LineCol, Vec<&'static str>)>
     where
-        F: Fn(&str) -> std::result::Result<Cst, E>,
-        E: Send,
+        F: Fn(&str) -> std::result::Result<Cst, peg::error::ParseError<peg::str::LineCol>>,
     {
         let mut lines = vec![0usize];
         lines.extend(text.match_indices('\n').map(|(p, _)| p + 1));
-        let cst = parser(text)?;
-        Ok(CstText {
-            text: text.to_owned(),
-            lines,
-            cst,
-        })
+        match parser(text) {
+            Ok(cst) => Ok(CstText {
+                text: text.to_owned(),
+                lines,
+                cst,
+            }),
+            Err(e) => {
+                let peg::str::LineCol { line, column, .. } = e.location;
+                let lc = LineCol {
+                    line: line - 1,
+                    column: column - 1,
+                }; // 0-indexed に変換
+                let expected: Vec<_> = e.expected.tokens().collect();
+                Err((lc, expected))
+            }
+        }
     }
 
     /// self.cst の子要素である Cst について、その要素に相当する text を取得する。
