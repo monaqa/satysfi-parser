@@ -614,7 +614,7 @@ peg::parser! {
         // §1. commands
         pub rule inline_cmd() -> Cst = (
             s:p() name:inline_cmd_name() _
-            opt:((cmd_expr_arg() / cmd_expr_option())** _) opttext:(";" {vec![]} / cmd_text_arg() ++ _) e:p()
+            opt:((cmd_expr_arg() / cmd_expr_option())** _) _ opttext:(";" {vec![]} / cmd_text_arg() ++ _) e:p()
             {
                 cst!(inline_cmd (s, e) [name, opt, opttext])
             }
@@ -630,7 +630,7 @@ peg::parser! {
 
         pub rule block_cmd() -> Cst = (
             s:p() name:block_cmd_name() _
-            opt:((cmd_expr_arg() / cmd_expr_option())** _) opttext:(";" {vec![]} / cmd_text_arg() ++ _) e:p()
+            opt:((cmd_expr_arg() / cmd_expr_option())** _) _ opttext:(";" {vec![]} / cmd_text_arg() ++ _) e:p()
             {
                 cst!(block_cmd (s, e) [name, opt, opttext])
             }
