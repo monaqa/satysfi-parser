@@ -261,6 +261,7 @@ impl Cst {
     }
 
     /// 与えられた pos を含む Pair を再帰的に探索する。
+    /// 範囲が小さいものから順に返す。
     pub fn dig(&self, pos: usize) -> Vec<&Cst> {
         let child = self.choose(pos);
         if let Some(child) = child {
@@ -270,6 +271,15 @@ impl Cst {
         } else {
             vec![]
         }
+    }
+
+    /// 自分の Cst の内部で、 child の親となる Cst
+    /// （child の scope を内包する最小の Cst）を探し、あればそれを返す。
+    pub fn get_parent(&self, child: &Cst) -> Option<&Cst> {
+        let child_pos = child.span.start;
+        self.dig(child_pos)
+            .into_iter()
+            .find(|&cst| cst.span.contains(&child.span) && cst.span != child.span)
     }
 
     pub fn mode(&self, pos: usize) -> Mode {
