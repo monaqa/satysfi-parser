@@ -252,7 +252,7 @@ impl CstText {
 
 #[test]
 fn test_is_comment() {
-    let csttext = CstText::parse("let x = 1 in% foo \n  2", grammar::expr).unwrap();
+    let csttext = CstText::parse("let x = 1 in% foo \n  2", grammar::program).unwrap();
     assert_eq!(csttext.is_comment(11), false); // let x = 1 i"n" foo
     assert_eq!(csttext.is_comment(12), false); // let x = 1 in"%" foo
     assert_eq!(csttext.is_comment(13), true); // let x = 1 in%" "foo
@@ -323,13 +323,17 @@ impl Cst {
     /// 範囲が小さいものから順に返す。
     pub fn dig(&self, pos: usize) -> Vec<&Cst> {
         let child = self.choose(pos);
-        if let Some(child) = child {
+        let mut v = if let Some(child) = child {
             let mut v = child.dig(pos);
             v.push(child);
             v
         } else {
             vec![]
+        };
+        if self.span.includes(pos) {
+            v.push(self);
         }
+        v
     }
 
     /// 自分の Cst の内部で、 child の親となる Cst
