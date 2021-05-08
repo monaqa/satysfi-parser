@@ -306,13 +306,18 @@ impl Cst {
     }
 }
 
+/// CST を楽に構成するためのマクロ。
 #[macro_export]
 macro_rules! cst {
-    // - Rule name: 省略可能
-    // - range: inner があるときのみ省略可能
-    // - inner: 省略可能、リストの形で直接記載可能
 
-    // 省略なし + inner リスト形式
+    ($rule:ident ($s:expr, $e:expr) []) => {
+        Cst {
+            rule: Rule::$rule,
+            span: Span {start: $s, end: $e},
+            inner: vec![]
+        }
+    };
+
     ($rule:ident ($s:expr, $e:expr) [$($inner:expr),*]) => {
         Cst {
             rule: Rule::$rule,
@@ -320,46 +325,5 @@ macro_rules! cst {
             inner: vec![$($inner.vectorize()),*].vectorize()
         }
     };
-    // 省略なし
-    ($rule:ident ($s:expr, $e:expr); $inner:expr) => {
-        Cst {
-            rule: Rule::$rule,
-            span: Span {start: $s, end: $e},
-            inner: $inner
-        }
-    };
 
-    // inner 省略
-    ($rule:ident ($s:expr, $e:expr)) => {
-        Cst {
-            rule: Rule::$rule,
-            span: Span {start: $s, end: $e},
-            inner: vec![]
-        }
-    };
-
-    // rule 省略
-    (($s:expr, $e:expr) [$($inner:expr),*]) => {
-        Cst {
-            rule: Rule::misc,
-            span: Span {start: $s, end: $e},
-            inner: vec![$($inner.vectorize()),*].vectorize()
-        }
-    };
-    (($s:expr, $e:expr); $inner:expr) => {
-        Cst {
-            rule: Rule::misc,
-            span: Span {start: $s, end: $e},
-            inner: $inner
-        }
-    };
-
-    // rule, inner 省略
-    (($s:expr, $e:expr)) => {
-        Cst {
-            rule: Rule::misc,
-            span: Span {start: $s, end: $e},
-            inner: vec![]
-        }
-    };
 }
