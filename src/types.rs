@@ -1,6 +1,8 @@
 use std::fmt::Display;
 
-use crate::Mode;
+use itertools::assert_equal;
+
+use crate::{grammar, Mode};
 
 use self::rule::Rule;
 
@@ -121,6 +123,13 @@ impl CstText {
     }
 
     /// self.cst の子要素である Cst について、その要素に相当する text を取得する。
+    pub fn get_text_from_span(&self, span: Span) -> &str {
+        let text = self.text.as_str();
+        let Span { start, end } = span;
+        &text[start..end]
+    }
+
+    /// self.cst の子要素である Cst について、その要素に相当する text を取得する。
     pub fn get_text(&self, cst: &Cst) -> &str {
         let text = self.text.as_str();
         let Span { start, end } = cst.span;
@@ -201,6 +210,56 @@ impl CstText {
         }
         s
     }
+
+    /// 与えられた場所がコメント内かどうか判定する。
+    pub fn is_comment(&self, pos: usize) -> bool {
+        let dig = self.cst.dig(pos);
+        let cst = dig.get(0);
+        if cst.is_none() {
+            return false;
+        }
+        let cst = cst.unwrap();
+        // cst: その pos を含む最小の cst
+        // span: pos を含む終端要素
+        let span = cst
+            .get_terminal_spans()
+            .into_iter()
+            .find(|span| span.includes(pos));
+        if span.is_none() {
+            // span が見つからないことは無いと思うんだけど
+            return false;
+        }
+        let span = span.unwrap();
+
+        // TODO: まあまあアドホックなのでなんとかしたい
+        let text = self.get_text_from_span(Span {
+            start: span.start,
+            end: pos,
+        });
+        for c in text.chars().rev() {
+            match c {
+                // 改行が見つかったらそこで探索打ち切り。コメントでないこと確定
+                '\n' => return false,
+                // コメント文字が見つかったらコメント確定。
+                '%' => return true,
+                _ => continue,
+            }
+        }
+        // 改行もコメント文字も何も見つからなかったらコメントでないこと確定。
+        false
+    }
+}
+
+#[test]
+fn test_is_comment() {
+    let csttext = CstText::parse("let x = 1 in% foo \n  2", grammar::expr).unwrap();
+    assert_eq!(csttext.is_comment(11), false); // let x = 1 i"n" foo
+    assert_eq!(csttext.is_comment(12), false); // let x = 1 in"%" foo
+    assert_eq!(csttext.is_comment(13), true); // let x = 1 in%" "foo
+    assert_eq!(csttext.is_comment(14), true); // let x = 1 in% "f"oo
+    assert_eq!(csttext.is_comment(17), true); // let x = 1 in% foo" "\n
+    assert_eq!(csttext.is_comment(18), true); // let x = 1 in% foo"\n"
+    assert_eq!(csttext.is_comment(19), false); // let x = 1 in% foo \n" "
 }
 
 impl Display for CstText {
@@ -301,6 +360,29 @@ impl Cst {
         for cst in &self.inner {
             let inner = cst.listup();
             v.extend(inner);
+        }
+        v
+    }
+
+    /// 終端要素の Span を返す。ここでいう終端要素とは、
+    /// 自身の Cst の span には含まれているが、子の span には含まれていない範囲。
+    pub fn get_terminal_spans(&self) -> Vec<Span> {
+        let mut v = vec![];
+        let mut i = self.span.start;
+        for inner in &self.inner {
+            if i != inner.span.start {
+                v.push(Span {
+                    start: i,
+                    end: inner.span.start,
+                })
+            }
+            i = inner.span.end;
+        }
+        if i != self.span.end {
+            v.push(Span {
+                start: i,
+                end: self.span.end,
+            })
         }
         v
     }
