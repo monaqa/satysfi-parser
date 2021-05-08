@@ -23,8 +23,12 @@ peg::parser! {
         // §1. common
 
         /// WHITESPACE
-        rule _() = ([' ' | '\t' | '\n' | '\r'] / comment())*
-        rule __() = comment()*
+        rule _() -> Vec<Span> =
+            ranges:([' ' | '\t' | '\n' | '\r'] {None} / range:comment() {Some(range)})*
+            {vectorize![ranges]}
+        /// COMMENT
+        /// 水平モードにおいて空白は重要な情報だが、コメントは無視できる。
+        rule __() -> Vec<Span> = comment()*
 
         /// alias for position
         rule p() -> usize = pos:position!() {pos}
@@ -49,7 +53,7 @@ peg::parser! {
         pub rule misc() -> Cst = DUMMY() { cst!(misc (0, 0) []) }
 
         /// comment
-        rule comment() = "%" comment_inner() ['\r' | '\n']
+        rule comment() -> Span = "%" s:p() comment_inner() e:p() ['\r' | '\n'] { Span{ start: s, end: e } }
         rule comment_inner() = NON_LF()*
 
         // §1. program
@@ -58,7 +62,7 @@ peg::parser! {
 
         pub rule program_saty() -> Cst =
             s:p() _
-            stage:header_stage()? _
+            stage:header_stage()? c1:_
             headers:headers() _
             pre:(pre:preamble() _ kwd("in") {pre})? _
             expr:expr() _
