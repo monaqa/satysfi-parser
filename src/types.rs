@@ -1,6 +1,6 @@
 use std::fmt::Display;
 
-use itertools::assert_equal;
+use itertools::{assert_equal, Itertools};
 
 use crate::{grammar, Mode};
 
@@ -232,11 +232,12 @@ impl CstText {
         let span = span.unwrap();
 
         // TODO: まあまあアドホックなのでなんとかしたい
-        let text = self.get_text_from_span(Span {
-            start: span.start,
-            end: pos,
-        });
-        for c in text.chars().rev() {
+        let text = self.get_text_from_span(span);
+        let char_indices = text.char_indices().map(|(idx, _)| idx).collect_vec();
+        let pos_char = char_indices
+            .binary_search(&(pos - span.start))
+            .unwrap_or_else(|x| x);
+        for c in text.chars().take(pos_char).collect_vec().into_iter().rev() {
             match c {
                 // 改行が見つかったらそこで探索打ち切り。コメントでないこと確定
                 '\n' => return false,
