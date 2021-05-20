@@ -78,7 +78,7 @@ impl Span {
 }
 
 /// コードを line & column 形式 (0-indexed) で指定したもの。
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct LineCol {
     pub line: usize,
     pub column: usize,
@@ -86,7 +86,7 @@ pub struct LineCol {
 
 /// CST にテキストの情報を付加したもの。
 // TODO: 自己参照構造体にする。
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq, Hash)]
 pub struct CstText {
     pub text: String,
     pub lines: Vec<usize>,
@@ -271,7 +271,7 @@ impl Display for CstText {
 
 /// Concrete syntax tree.
 /// 1つの CST は構文規則、テキストの範囲、子要素からなり、全体として木構造をなす。
-#[derive(Debug, PartialEq, Eq, Clone)]
+#[derive(Debug, PartialEq, Eq, Clone, Hash)]
 pub struct Cst {
     /// 構文規則。
     pub rule: Rule,
