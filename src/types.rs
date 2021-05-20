@@ -59,7 +59,7 @@ impl<T> Vectorize<T> for Option<Vec<T>> {
 }
 
 /// コードの範囲を表すもの。 usize 2 個ぶんなので Copyable.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct Span {
     pub start: usize,
     pub end: usize,
