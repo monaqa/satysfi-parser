@@ -818,8 +818,10 @@ peg::parser! {
         rule math_group() -> Cst = "{" _ m:math_single() _ "}" {m} / math_unary()
 
         pub rule math_unary() -> Cst =
-            // TODO: allow unicode characters
-            s:p() ['A'..='Z' | 'a'..='z' | '0'..='9'] e:p() { cst!(math_unary (s, e) []) }
+            s:p() [^ '+' | '-' | '*' | '/' | ':' | '=' | '<' | '>' | '~' | '.' | ',' | '`' | '?' | ' ' |
+                    '\t' | '\n' | '\r' | '\\' | '{' | '}' | '%' | '|' | '$' | '#' | ';' | '\'' | '^' | '_' | '!' ] e:p() {
+                        cst!(math_unary (s, e) []) 
+            }
             / s:p() r"\" math_special_char() e:p() { cst!(math_unary (s, e) []) }
             / s:p() math_symbol() e:p() { cst!(math_unary (s, e) []) }
             / s:p() m:math_cmd() e:p() { cst!(math_unary (s, e) [m]) }
