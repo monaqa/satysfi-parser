@@ -23,8 +23,14 @@ peg::parser! {
         // §1. common
 
         /// WHITESPACE
-        rule _() = ([' ' | '\t' | '\n' | '\r'] / comment())*
+        rule _() = spaces()
+        /// COMMENT
+        /// 水平モードにおいて空白は重要な情報だが、コメントは無視できる。
         rule __() = comment()*
+
+        pub rule spaces() -> Vec<Span> =
+            ranges:([' ' | '\t' | '\n' | '\r'] {None} / range:comment() {Some(range)})*
+            {vectorize![ranges]}
 
         /// alias for position
         rule p() -> usize = pos:position!() {pos}
@@ -46,10 +52,10 @@ peg::parser! {
         /// "let" にはマッチするが "leti" や "let-inline" にはマッチしなくなる。
         rule kwd(word: &'static str) = ##parse_string_literal(word) !ASCII_ALPHANUMERIC_HYPHEN()
 
-        pub rule misc() -> Cst = DUMMY() { cst!((0, 0)) }
+        pub rule misc() -> Cst = DUMMY() { cst!(misc (0, 0) []) }
 
         /// comment
-        rule comment() = "%" comment_inner() ['\r' | '\n']
+        rule comment() -> Span = "%" s:p() comment_inner() e:p() ['\r' | '\n'] { Span{ start: s, end: e } }
         rule comment_inner() = NON_LF()*
 
         // §1. program
@@ -81,11 +87,11 @@ peg::parser! {
 
         pub rule stage() -> Cst =
             s:p() ("0" / "1" / "persistent") e:p()
-        { cst!(stage (s, e)) }
+        { cst!(stage (s, e) []) }
 
         pub rule headers() -> Cst =
             s:p() v:(h: header() _ {h})* e:p()
-        { cst!(headers (s, e); v) }
+        { cst!(headers (s, e) [v]) }
 
         rule header() -> Cst = header_require() / header_import() / dummy_header()
 
@@ -105,11 +111,11 @@ peg::parser! {
                 / "@" ['\n' | '\r']
             )
             e:p()
-        { cst!(dummy_header (s, e)) }
+        { cst!(dummy_header (s, e) []) }
 
         pub rule pkgname() -> Cst =
             s:p() NON_LF()+ e:p()
-        { cst!(pkgname (s, e)) }
+        { cst!(pkgname (s, e) []) }
 
         // §1. statement
 
@@ -221,7 +227,7 @@ peg::parser! {
             s:p()
             (kwd("let") / kwd("module") / kwd("type")) _ var() ** _
             e:p()
-        { cst!(dummy_stmt (s, e)) }
+        { cst!(dummy_stmt (s, e) []) }
 
         pub rule arg() -> Cst =
             s:p() p:pattern() e:p() { cst!(arg (s, e) [p]) }
@@ -271,7 +277,7 @@ peg::parser! {
             s:p()
             !kwd("end") _ var_ptn()
             e:p()
-        { cst!(dummy_sig_stmt (s, e)) }
+        { cst!(dummy_sig_stmt (s, e) []) }
 
         // §1. types
 
@@ -286,7 +292,7 @@ peg::parser! {
             e:p()
         { cst!(type_expr (s, e) [typeprods, typeprod]) }
 
-        pub rule type_optional() -> Cst = s:p() t:type_prod() e:p() { cst!(type_optional (s, e); t.inner) }
+        pub rule type_optional() -> Cst = s:p() t:type_prod() e:p() { cst!(type_optional (s, e) [t.inner]) }
 
         pub rule type_prod() -> Cst =
             s:p() t:type_unary() ts:(_ "*" _ t:type_unary() {t})* e:p()
@@ -335,7 +341,7 @@ peg::parser! {
         { cst!(type_name (s, e) [t]) }
 
         pub rule type_record() -> Cst =
-            s:p() "(|" _ "|)" e:p() { cst!(type_record (s, e)) }
+            s:p() "(|" _ "|)" e:p() { cst!(type_record (s, e) []) }
             / s:p() "(|" _ ts:(type_record_unit() ++ (_ ";" _)) _ ";"? _ "|)" e:p() { cst!(type_record (s, e) [ts]) }
 
         pub rule type_record_unit() -> Cst =
@@ -366,7 +372,7 @@ peg::parser! {
             s:p() p:pat_list() e:p() { cst!(pattern (s, e) [p]) }
             / s:p() "(" _ p:pat_as() _ ")" e:p() { cst!(pattern (s, e) [p]) }
             / s:p() p:pat_tuple() e:p() { cst!(pattern (s, e) [p]) }
-            / s:p() "_" e:p() { cst!(pattern (s, e)) }
+            / s:p() "_" e:p() { cst!(pattern (s, e) []) }
             / s:p() v:var() e:p() { cst!(pattern (s, e) [v]) }
             / s:p() l:constant() e:p() { cst!(pattern (s, e) [l]) }
 
@@ -375,7 +381,7 @@ peg::parser! {
         { cst!(pat_variant (s, e) [v, p]) }
 
         pub rule pat_list() -> Cst =
-            s:p() "[" _ "]" e:p() { cst!(pat_list (s, e)) }
+            s:p() "[" _ "]" e:p() { cst!(pat_list (s, e) []) }
             / s:p() "[" _ ms:(pat_as() ** (_ ";" _)) _ ";"? _ "]" e:p() { cst!(pat_list (s, e) [ms]) }
 
         pub rule pat_tuple() -> Cst =
@@ -456,7 +462,7 @@ peg::parser! {
 
         pub rule unary_operator() -> Cst =
             s:p() ("-" / kwd("not") ) e:p()
-        { cst!(unary_operator (s, e)) }
+        { cst!(unary_operator (s, e) []) }
 
         pub rule application() -> Cst =
             s:p()
@@ -469,7 +475,7 @@ peg::parser! {
 
         pub rule application_args_optional() -> Cst =
             s:p() "?:" _ u:(unary()) e:p() { cst!(application_args_optional (s, e) [u]) }
-            / s:p() "?*" e:p() { cst!(application_args_optional (s, e)) }
+            / s:p() "?*" e:p() { cst!(application_args_optional (s, e) []) }
 
         pub rule application_args_normal() -> Cst =
             s:p() u:(unary() / variant_name()) e:p()
@@ -506,7 +512,7 @@ peg::parser! {
             e:p()
         { cst!(unary (s, e) [prefix, body]) }
 
-        pub rule unary_prefix() -> Cst = s:p() ("!" / "&" / "~") e:p() { cst!(unary_prefix (s, e)) }
+        pub rule unary_prefix() -> Cst = s:p() ("!" / "&" / "~") e:p() { cst!(unary_prefix (s, e) []) }
 
         pub rule block_text() -> Cst =
             s:p() "'<" _ v:vertical() _ ">" e:p()
@@ -521,7 +527,7 @@ peg::parser! {
         { cst!(math_text (s, e) [m]) }
 
         pub rule record() -> Cst =
-            s:p() "(|" _ "|)" e:p() { cst!(record (s, e)) }
+            s:p() "(|" _ "|)" e:p() { cst!(record (s, e) []) }
             / s:p() "(|" _ u:unary() _ kwd("with") _ i:record_inner() _ "|)" e:p() { cst!(record (s, e) [u, i]) }
             / s:p() "(|" _ i:record_inner() _ "|)" e:p() { cst!(record (s, e) [i]) }
 
@@ -534,7 +540,7 @@ peg::parser! {
         { cst!(record_unit (s, e) [v, expr]) }
 
         pub rule list() -> Cst =
-            s:p() "[" _ "]" e:p() { cst!(list (s, e)) }
+            s:p() "[" _ "]" e:p() { cst!(list (s, e) []) }
             / s:p() "[" _ exprs:(expr() ++ (_ ";" _)) _ ";"? _ "]" e:p() { cst!(list (s, e) [exprs]) }
 
         pub rule tuple() -> Cst =
@@ -542,7 +548,7 @@ peg::parser! {
 
         pub rule bin_operator() -> Cst =
             s:p() !bin_operator_except() (bin_operator_start() bin_operator_succ()* / "::" / kwd("mod")) e:p()
-        { cst!(bin_operator (s, e)) }
+        { cst!(bin_operator (s, e) []) }
         rule bin_operator_start() =
             [ '-' | '+' | '*' | '/' | '^' | '&' | '|' | '=' | '<' | '>' ]
         rule bin_operator_succ() =
@@ -556,11 +562,11 @@ peg::parser! {
 
         pub rule var() -> Cst =
             s:p() !(reserved_word() !ASCII_ALPHANUMERIC_HYPHEN()) var_ptn() e:p()
-        { cst!(var (s, e)) }
+        { cst!(var (s, e) []) }
 
         pub rule var_ptn() -> Cst =
             s:p() ['a'..='z'] ASCII_ALPHANUMERIC_HYPHEN()* e:p()
-        { cst!(var_ptn (s, e)) }
+        { cst!(var_ptn (s, e) []) }
 
         // 予約語たち
         rule reserved_word() =
@@ -584,11 +590,11 @@ peg::parser! {
 
         pub rule module_name() -> Cst =
             s:p() ['A' ..= 'Z'] ASCII_ALPHANUMERIC_HYPHEN()* e:p()
-        { cst!(module_name (s, e)) }
+        { cst!(module_name (s, e) []) }
 
         pub rule variant_name() -> Cst =
             s:p() ['A' ..= 'Z'] ASCII_ALPHANUMERIC_HYPHEN()* e:p()
-        { cst!(variant_name (s, e)) }
+        { cst!(variant_name (s, e) []) }
 
         // §1. constants
         rule constant() -> Cst =
@@ -600,24 +606,24 @@ peg::parser! {
             / const_int()
 
         pub rule const_unit() -> Cst =
-            s:p() "(" _ ")" e:p() { cst!(const_unit (s, e)) }
+            s:p() "(" _ ")" e:p() { cst!(const_unit (s, e) []) }
 
         pub rule const_bool() -> Cst =
-            s:p() (kwd("true") / kwd("false")) e:p() {cst!(const_bool (s, e))}
+            s:p() (kwd("true") / kwd("false")) e:p() {cst!(const_bool (s, e) [])}
 
         pub rule const_int() -> Cst =
-            s:p() (const_int_decimal() / const_int_hex() / "0") e:p() { cst!(const_int (s, e)) }
+            s:p() (const_int_decimal() / const_int_hex() / "0") e:p() { cst!(const_int (s, e) []) }
         rule const_int_decimal() = ['1'..='9'] ASCII_DIGIT()*
         rule const_int_hex() = "0" ['x' | 'X'] ['0'..='9' | 'A'..='F']+
 
         pub rule const_float() -> Cst =
             s:p() const_float_inner() !length_unit() e:p()
-            { cst!(const_float (s, e)) }
+            { cst!(const_float (s, e) []) }
         rule const_float_inner() = ASCII_DIGIT()+ "." ASCII_DIGIT()* / "." ASCII_DIGIT()+
 
         pub rule const_length() -> Cst =
             s:p() length_digit() length_unit() e:p()
-            { cst!(const_length (s, e)) }
+            { cst!(const_length (s, e) []) }
 
         rule length_digit() = "-"? (const_float_inner() / const_int_decimal() / "0")
         rule length_unit() = ['a'..='z'] ['0'..='9' | 'a'..='z' | 'A' ..='Z' | '-']*
@@ -626,7 +632,7 @@ peg::parser! {
             s:p() "#"? qs:string_quotes() (!string_inner(qs) [_])+ qe:string_quotes() "#"? e:p()
             {?
                 if qs == qe {
-                    Ok(cst!(const_string (s, e)))
+                    Ok(cst!(const_string (s, e) []))
                 } else {
                     Err("number of back quotation does not match.")
                 }
@@ -649,7 +655,7 @@ peg::parser! {
 
         pub rule cmd_name_ptn() -> Cst =
             s:p() ['A'..='Z' | 'a'..='z'] ASCII_ALPHANUMERIC_HYPHEN()* e:p()
-        { cst!(cmd_name_ptn (s, e)) }
+        { cst!(cmd_name_ptn (s, e) []) }
 
         pub rule block_cmd() -> Cst = (
             s:p() name:block_cmd_name() _
@@ -665,11 +671,11 @@ peg::parser! {
 
         pub rule cmd_expr_arg() -> Cst =
             s:p() inner:cmd_expr_arg_inner() e:p() { cst!(cmd_expr_arg (s, e) [inner]) }
-            / s:p() "?*" e:p() { cst!(cmd_expr_arg (s, e)) }
+            / s:p() "?*" e:p() { cst!(cmd_expr_arg (s, e) []) }
 
         pub rule cmd_expr_option() -> Cst =
             s:p() "?:" _ inner:cmd_expr_arg_inner() e:p() { cst!(cmd_expr_option (s, e) [inner]) }
-            / s:p() "?*" e:p() { cst!(cmd_expr_option (s, e)) }
+            / s:p() "?*" e:p() { cst!(cmd_expr_option (s, e) []) }
 
         rule cmd_expr_arg_inner() -> Cst =
             const_unit()
@@ -738,17 +744,17 @@ peg::parser! {
 
         pub rule regular_text() -> Cst =
             s:p() $(!horizontal_special_char() [_])+ e:p()
-        { cst!(regular_text (s, e)) }
+        { cst!(regular_text (s, e) []) }
 
         pub rule dummy_inline_cmd_incomplete() -> Cst =
             s:p()
             "\\" (var_ptn() / modvar())?
             e:p()
-        { cst!(dummy_inline_cmd_incomplete (s, e)) }
+        { cst!(dummy_inline_cmd_incomplete (s, e) []) }
 
         pub rule horizontal_escaped_char() -> Cst =
             s:p() "\\" horizontal_special_char() e:p()
-        { cst!(horizontal_escaped_char (s, e)) }
+        { cst!(horizontal_escaped_char (s, e) []) }
 
         rule horizontal_special_char() =
             ['@' | '`' | '\\' | '{' | '}' | '%' | '|' | '*' | '$' | '#' | ';']
@@ -769,7 +775,7 @@ peg::parser! {
 
         pub rule horizontal_bullet_star() -> Cst =
             s:p() "*"+ e:p()
-            { cst!(horizontal_bullet_star (s, e)) }
+            { cst!(horizontal_bullet_star (s, e) []) }
 
         // §1. vertical mode
 
@@ -787,7 +793,7 @@ peg::parser! {
             s:p()
             "\\" (var_ptn() / modvar())?
             e:p()
-        { cst!(dummy_block_cmd_incomplete (s, e)) }
+        { cst!(dummy_block_cmd_incomplete (s, e) []) }
 
         // §1. math mode
 
@@ -813,9 +819,9 @@ peg::parser! {
 
         pub rule math_unary() -> Cst =
             // TODO: allow unicode characters
-            s:p() ['A'..='Z' | 'a'..='z' | '0'..='9'] e:p() { cst!(math_unary (s, e)) }
-            / s:p() r"\" math_special_char() e:p() { cst!(math_unary (s, e)) }
-            / s:p() math_symbol() e:p() { cst!(math_unary (s, e)) }
+            s:p() ['A'..='Z' | 'a'..='z' | '0'..='9'] e:p() { cst!(math_unary (s, e) []) }
+            / s:p() r"\" math_special_char() e:p() { cst!(math_unary (s, e) []) }
+            / s:p() math_symbol() e:p() { cst!(math_unary (s, e) []) }
             / s:p() m:math_cmd() e:p() { cst!(math_unary (s, e) [m]) }
             / s:p() m:math_embedding() e:p() { cst!(math_unary (s, e) [m]) }
 

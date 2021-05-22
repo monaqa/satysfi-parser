@@ -1,6 +1,8 @@
 use std::fmt::Display;
 
-use crate::Mode;
+use itertools::{assert_equal, Itertools};
+
+use crate::{grammar, Mode};
 
 use self::rule::Rule;
 
@@ -121,6 +123,13 @@ impl CstText {
     }
 
     /// self.cst の子要素である Cst について、その要素に相当する text を取得する。
+    pub fn get_text_from_span(&self, span: Span) -> &str {
+        let text = self.text.as_str();
+        let Span { start, end } = span;
+        &text[start..end]
+    }
+
+    /// self.cst の子要素である Cst について、その要素に相当する text を取得する。
     pub fn get_text(&self, cst: &Cst) -> &str {
         let text = self.text.as_str();
         let Span { start, end } = cst.span;
@@ -201,6 +210,57 @@ impl CstText {
         }
         s
     }
+
+    /// 与えられた場所がコメント内かどうか判定する。
+    pub fn is_comment(&self, pos: usize) -> bool {
+        let dig = self.cst.dig(pos);
+        let cst = dig.get(0);
+        if cst.is_none() {
+            return false;
+        }
+        let cst = cst.unwrap();
+        // cst: その pos を含む最小の cst
+        // span: pos を含む終端要素
+        let span = cst
+            .get_terminal_spans()
+            .into_iter()
+            .find(|span| span.includes(pos));
+        if span.is_none() {
+            // span が見つからないことは無いと思うんだけど
+            return false;
+        }
+        let span = span.unwrap();
+
+        // TODO: まあまあアドホックなのでなんとかしたい
+        let text = self.get_text_from_span(span);
+        let char_indices = text.char_indices().map(|(idx, _)| idx).collect_vec();
+        let pos_char = char_indices
+            .binary_search(&(pos - span.start))
+            .unwrap_or_else(|x| x);
+        for c in text.chars().take(pos_char).collect_vec().into_iter().rev() {
+            match c {
+                // 改行が見つかったらそこで探索打ち切り。コメントでないこと確定
+                '\n' => return false,
+                // コメント文字が見つかったらコメント確定。
+                '%' => return true,
+                _ => continue,
+            }
+        }
+        // 改行もコメント文字も何も見つからなかったらコメントでないこと確定。
+        false
+    }
+}
+
+#[test]
+fn test_is_comment() {
+    let csttext = CstText::parse("let x = 1 in% foo \n  2", grammar::program).unwrap();
+    assert_eq!(csttext.is_comment(11), false); // let x = 1 i"n" foo
+    assert_eq!(csttext.is_comment(12), false); // let x = 1 in"%" foo
+    assert_eq!(csttext.is_comment(13), true); // let x = 1 in%" "foo
+    assert_eq!(csttext.is_comment(14), true); // let x = 1 in% "f"oo
+    assert_eq!(csttext.is_comment(17), true); // let x = 1 in% foo" "\n
+    assert_eq!(csttext.is_comment(18), true); // let x = 1 in% foo"\n"
+    assert_eq!(csttext.is_comment(19), false); // let x = 1 in% foo \n" "
 }
 
 impl Display for CstText {
@@ -261,15 +321,29 @@ impl Cst {
     }
 
     /// 与えられた pos を含む Pair を再帰的に探索する。
+    /// 範囲が小さいものから順に返す。
     pub fn dig(&self, pos: usize) -> Vec<&Cst> {
         let child = self.choose(pos);
-        if let Some(child) = child {
+        let mut v = if let Some(child) = child {
             let mut v = child.dig(pos);
             v.push(child);
             v
         } else {
             vec![]
+        };
+        if self.span.includes(pos) {
+            v.push(self);
         }
+        v
+    }
+
+    /// 自分の Cst の内部で、 child の親となる Cst
+    /// （child の scope を内包する最小の Cst）を探し、あればそれを返す。
+    pub fn get_parent(&self, child: &Cst) -> Option<&Cst> {
+        let child_pos = child.span.start;
+        self.dig(child_pos)
+            .into_iter()
+            .find(|&cst| cst.span.contains(&child.span) && cst.span != child.span)
     }
 
     pub fn mode(&self, pos: usize) -> Mode {
@@ -294,15 +368,43 @@ impl Cst {
         }
         v
     }
+
+    /// 終端要素の Span を返す。ここでいう終端要素とは、
+    /// 自身の Cst の span には含まれているが、子の span には含まれていない範囲。
+    pub fn get_terminal_spans(&self) -> Vec<Span> {
+        let mut v = vec![];
+        let mut i = self.span.start;
+        for inner in &self.inner {
+            if i != inner.span.start {
+                v.push(Span {
+                    start: i,
+                    end: inner.span.start,
+                })
+            }
+            i = inner.span.end;
+        }
+        if i != self.span.end {
+            v.push(Span {
+                start: i,
+                end: self.span.end,
+            })
+        }
+        v
+    }
 }
 
+/// CST を楽に構成するためのマクロ。
 #[macro_export]
 macro_rules! cst {
-    // - Rule name: 省略可能
-    // - range: inner があるときのみ省略可能
-    // - inner: 省略可能、リストの形で直接記載可能
 
-    // 省略なし + inner リスト形式
+    ($rule:ident ($s:expr, $e:expr) []) => {
+        Cst {
+            rule: Rule::$rule,
+            span: Span {start: $s, end: $e},
+            inner: vec![]
+        }
+    };
+
     ($rule:ident ($s:expr, $e:expr) [$($inner:expr),*]) => {
         Cst {
             rule: Rule::$rule,
@@ -310,46 +412,5 @@ macro_rules! cst {
             inner: vec![$($inner.vectorize()),*].vectorize()
         }
     };
-    // 省略なし
-    ($rule:ident ($s:expr, $e:expr); $inner:expr) => {
-        Cst {
-            rule: Rule::$rule,
-            span: Span {start: $s, end: $e},
-            inner: $inner
-        }
-    };
 
-    // inner 省略
-    ($rule:ident ($s:expr, $e:expr)) => {
-        Cst {
-            rule: Rule::$rule,
-            span: Span {start: $s, end: $e},
-            inner: vec![]
-        }
-    };
-
-    // rule 省略
-    (($s:expr, $e:expr) [$($inner:expr),*]) => {
-        Cst {
-            rule: Rule::misc,
-            span: Span {start: $s, end: $e},
-            inner: vec![$($inner.vectorize()),*].vectorize()
-        }
-    };
-    (($s:expr, $e:expr); $inner:expr) => {
-        Cst {
-            rule: Rule::misc,
-            span: Span {start: $s, end: $e},
-            inner: $inner
-        }
-    };
-
-    // rule, inner 省略
-    (($s:expr, $e:expr)) => {
-        Cst {
-            rule: Rule::misc,
-            span: Span {start: $s, end: $e},
-            inner: vec![]
-        }
-    };
 }
