@@ -177,7 +177,7 @@ make_rule! {
     dummy_block_cmd_incomplete,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum Mode {
     /// プログラムモード
     Program,
