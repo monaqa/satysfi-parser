@@ -6,6 +6,9 @@ use crate::{grammar, Mode};
 
 use self::rule::Rule;
 
+pub mod rule;
+pub mod structure;
+
 pub trait Vectorize<T> {
     /// 色んなものを強引に vector にしてしまう恐ろしいメソッド。
     /// 構文解析ではオプショナルな構文要素があったり、配列状の構文要素があったりするため
@@ -278,8 +281,6 @@ pub struct Cst {
     pub span: Span,
     pub inner: Vec<Cst>,
 }
-
-pub mod rule;
 
 impl Cst {
     /// 新たな CST を作成する。
