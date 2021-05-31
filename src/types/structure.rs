@@ -1,7 +1,8 @@
 //! saty ファイル、satyh ファイルの大まかな構造を格納したデータ構造。
 
-use crate::{Cst, CstText, LineCol, Rule};
+use crate::{Cst, CstText, LineCol, Rule, Span};
 use anyhow::{anyhow, Result};
+use itertools::Itertools;
 
 trait FromCst: Sized {
     fn from_cst(cst: &Cst) -> Result<Self>;
@@ -11,6 +12,7 @@ trait FromCst: Sized {
 #[derive(Debug)]
 pub struct ProgramText {
     pub structure: Result<Program>,
+    pub cst: Cst,
     pub lines: Vec<usize>,
     pub text: String,
 }
@@ -24,6 +26,7 @@ impl ProgramText {
                 let structure = Program::from_cst(&cst);
                 Ok(ProgramText {
                     text: text.to_owned(),
+                    cst,
                     lines,
                     structure,
                 })
@@ -38,6 +41,116 @@ impl ProgramText {
                 Err((lc, expected))
             }
         }
+    }
+
+    /// self.cst の子要素である Cst について、その要素に相当する text を取得する。
+    pub fn get_text_from_span(&self, span: Span) -> &str {
+        let text = self.text.as_str();
+        let Span { start, end } = span;
+        &text[start..end]
+    }
+
+    /// self.cst の子要素である Cst について、その要素に相当する text を取得する。
+    pub fn get_text(&self, cst: &Cst) -> &str {
+        let text = self.text.as_str();
+        let Span { start, end } = cst.span;
+        &text[start..end]
+    }
+
+    /// 与えられた position の line 及び col を出力する。
+    pub fn get_line_col(&self, pos: usize) -> Option<LineCol> {
+        if pos > self.text.len() {
+            return None;
+        }
+        let line = match self.lines.binary_search(&pos) {
+            Ok(i) => i,
+            Err(i) => i - 1,
+        };
+        let column = pos - self.lines[line];
+        Some(LineCol { line, column })
+    }
+
+    /// 与えられた line 及び col の position を出力する。
+    pub fn from_line_col(&self, line: usize, column: usize) -> Option<usize> {
+        let idxline = self.lines.get(line)?;
+        let max_idx = match self.lines.get(line + 1) {
+            Some(idx) => *idx,
+            None => self.text.len(),
+        };
+        if (*idxline + column) < max_idx {
+            Some(*idxline + column)
+        } else {
+            None
+        }
+    }
+
+    /// Cst を pritty 表示。
+    pub fn pritty_cst(&self, cst: &Cst) -> String {
+        let mut s = String::new();
+        s.push_str(&format!("[{:?}]", cst.rule));
+
+        // 長すぎないものだけテキストを表示
+        let Span { start, end } = cst.span;
+        let slice = &self.text[start..end];
+        if !slice.contains('\n') && slice.len() < 80 {
+            s.push_str(&format!(": \"{}\"", slice));
+        } else {
+            let LineCol {
+                line: start_line,
+                column: start_column,
+            } = self.get_line_col(start).unwrap();
+            let LineCol {
+                line: end_line,
+                column: end_column,
+            } = self.get_line_col(end).unwrap();
+            s.push_str(&format!(
+                " (L{}-C{} .. L{}-C{})",
+                start_line + 1,
+                start_column + 1,
+                end_line + 1,
+                end_column + 1
+            ));
+        }
+        s
+    }
+
+    /// 与えられた場所がコメント内かどうか判定する。
+    pub fn is_comment(&self, pos: usize) -> bool {
+        let dig = self.cst.dig(pos);
+        let cst = dig.get(0);
+        if cst.is_none() {
+            return false;
+        }
+        let cst = cst.unwrap();
+        // cst: その pos を含む最小の cst
+        // span: pos を含む終端要素
+        let span = cst
+            .get_terminal_spans()
+            .into_iter()
+            .find(|span| span.includes(pos));
+        if span.is_none() {
+            // span が見つからないことは無いと思うんだけど
+            return false;
+        }
+        let span = span.unwrap();
+
+        // TODO: まあまあアドホックなのでなんとかしたい
+        let text = self.get_text_from_span(span);
+        let char_indices = text.char_indices().map(|(idx, _)| idx).collect_vec();
+        let pos_char = char_indices
+            .binary_search(&(pos - span.start))
+            .unwrap_or_else(|x| x);
+        for c in text.chars().take(pos_char).collect_vec().into_iter().rev() {
+            match c {
+                // 改行が見つかったらそこで探索打ち切り。コメントでないこと確定
+                '\n' => return false,
+                // コメント文字が見つかったらコメント確定。
+                '%' => return true,
+                _ => continue,
+            }
+        }
+        // 改行もコメント文字も何も見つからなかったらコメントでないこと確定。
+        false
     }
 }
 
