@@ -1,27 +1,47 @@
 //! saty ファイル、satyh ファイルの大まかな構造を格納したデータ構造。
 
-use crate::{Cst, CstText, Rule};
+use crate::{Cst, CstText, LineCol, Rule};
+use anyhow::{anyhow, Result};
 
 trait FromCst: Sized {
     fn from_cst(cst: &Cst) -> Option<Self>;
 }
 
+/// CstText と似ているが、こちらは構文要素が構造体で分かれている。
+#[derive(Debug, PartialEq, Eq)]
 pub struct ProgramText {
-    pub structure: Program,
+    pub structure: Option<Program>,
+    pub lines: Vec<usize>,
     pub text: String,
 }
 
 impl ProgramText {
-    pub fn parse(text: &str) -> Option<ProgramText> {
-        let csttext = CstText::parse(text, crate::grammar::program).ok()?;
-        let structure = Program::from_cst(&csttext.cst)?;
-        Some(ProgramText {
-            structure,
-            text: text.to_owned(),
-        })
+    pub fn parse(text: &str) -> std::result::Result<Self, (LineCol, Vec<&'static str>)> {
+        match crate::grammar::program(text) {
+            Ok(cst) => {
+                let mut lines = vec![0usize];
+                lines.extend(text.match_indices('\n').map(|(p, _)| p + 1));
+                let structure = Program::from_cst(&cst);
+                Ok(ProgramText {
+                    text: text.to_owned(),
+                    lines,
+                    structure,
+                })
+            }
+            Err(e) => {
+                let peg::str::LineCol { line, column, .. } = e.location;
+                let lc = LineCol {
+                    line: line - 1,
+                    column: column - 1,
+                }; // 0-indexed に変換
+                let expected: Vec<_> = e.expected.tokens().collect();
+                Err((lc, expected))
+            }
+        }
     }
 }
 
+#[derive(Debug, PartialEq, Eq)]
 pub enum Program {
     Saty {
         header_stage: Option<Cst>,
@@ -97,6 +117,7 @@ impl FromCst for Program {
     }
 }
 
+#[derive(Debug, PartialEq, Eq)]
 pub struct Header {
     pub name: Cst,
     pub kind: HeaderKind,
@@ -114,11 +135,13 @@ impl FromCst for Header {
     }
 }
 
+#[derive(Debug, PartialEq, Eq)]
 pub enum HeaderKind {
     Require,
     Import,
 }
 
+#[derive(Debug, PartialEq, Eq)]
 pub enum Statement {
     Let {
         pat: Cst,
@@ -320,6 +343,7 @@ impl FromCst for Statement {
     }
 }
 
+#[derive(Debug, PartialEq, Eq)]
 pub enum Signature {
     Type {
         param: Vec<Cst>,
@@ -387,12 +411,14 @@ impl FromCst for Signature {
     }
 }
 
+#[derive(Debug, PartialEq, Eq)]
 pub struct LetRecInner {
     pub pattern: Cst,
     pub type_expr: Option<Cst>,
     pub variant: Vec<LetRecVariant>,
 }
 
+#[derive(Debug, PartialEq, Eq)]
 pub struct LetRecVariant {
     pub args: Vec<Cst>,
     pub expr: Cst,
@@ -423,6 +449,8 @@ impl FromCst for LetRecInner {
         })
     }
 }
+
+#[derive(Debug, PartialEq, Eq)]
 pub struct TypeInner {
     pub param: Vec<Cst>,
     pub name: Cst,
@@ -460,6 +488,7 @@ impl FromCst for TypeInner {
     }
 }
 
+#[derive(Debug, PartialEq, Eq)]
 pub enum TypeBody {
     Variants(Vec<Cst>),
     Expr(Cst),
