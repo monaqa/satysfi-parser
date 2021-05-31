@@ -4,13 +4,13 @@ use crate::{Cst, CstText, LineCol, Rule};
 use anyhow::{anyhow, Result};
 
 trait FromCst: Sized {
-    fn from_cst(cst: &Cst) -> Option<Self>;
+    fn from_cst(cst: &Cst) -> Result<Self>;
 }
 
 /// CstText と似ているが、こちらは構文要素が構造体で分かれている。
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug)]
 pub struct ProgramText {
-    pub structure: Option<Program>,
+    pub structure: Result<Program>,
     pub lines: Vec<usize>,
     pub text: String,
 }
@@ -57,17 +57,22 @@ pub enum Program {
 }
 
 impl FromCst for Program {
-    fn from_cst(cst: &Cst) -> Option<Self> {
+    fn from_cst(cst: &Cst) -> Result<Self> {
         let mut inner = cst.inner.iter().peekable();
-        let header_stage = if inner.peek()?.rule == Rule::stage {
-            let stage = inner.next()?;
+        let header_stage = if inner
+            .peek()
+            .ok_or(anyhow!("expected stage or headers."))?
+            .rule
+            == Rule::stage
+        {
+            let stage = inner.next().unwrap();
             Some(stage.clone())
         } else {
             None
         };
         let header = {
-            let headers = inner.next()?;
-            let v: Option<Vec<_>> = headers
+            let headers = inner.next().unwrap();
+            let v: Result<Vec<_>> = headers
                 .inner
                 .iter()
                 .map(|cst| Header::from_cst(cst))
@@ -77,9 +82,14 @@ impl FromCst for Program {
 
         match cst.rule {
             Rule::program_saty => {
-                let preamble = if inner.peek()?.rule == Rule::preamble {
-                    let preamble = inner.next()?;
-                    let v: Option<Vec<_>> = preamble
+                let preamble = if inner
+                    .peek()
+                    .ok_or(anyhow!("expected preamble or expr"))?
+                    .rule
+                    == Rule::preamble
+                {
+                    let preamble = inner.next().unwrap();
+                    let v: Result<Vec<_>> = preamble
                         .inner
                         .iter()
                         .map(|cst| Statement::from_cst(cst))
@@ -88,8 +98,8 @@ impl FromCst for Program {
                 } else {
                     vec![]
                 };
-                let expr = inner.next()?.clone();
-                Some(Program::Saty {
+                let expr = inner.next().ok_or(anyhow!("expected expr"))?.clone();
+                Ok(Program::Saty {
                     header_stage,
                     header,
                     preamble,
@@ -98,15 +108,15 @@ impl FromCst for Program {
             }
             Rule::program_satyh => {
                 let preamble = {
-                    let preamble = inner.next()?;
-                    let v: Option<Vec<_>> = preamble
+                    let preamble = inner.next().ok_or(anyhow!("expected preamble"))?;
+                    let v: Result<Vec<_>> = preamble
                         .inner
                         .iter()
                         .map(|cst| Statement::from_cst(cst))
                         .collect();
                     v?
                 };
-                Some(Program::Satyh {
+                Ok(Program::Satyh {
                     header_stage,
                     header,
                     preamble,
@@ -124,14 +134,14 @@ pub struct Header {
 }
 
 impl FromCst for Header {
-    fn from_cst(cst: &Cst) -> Option<Self> {
-        let name = cst.inner.get(0)?.clone();
+    fn from_cst(cst: &Cst) -> Result<Self> {
+        let name = cst.inner.get(0).ok_or(anyhow!("expected pkgname"))?.clone();
         let kind = match cst.rule {
             Rule::header_require => HeaderKind::Require,
             Rule::header_import => HeaderKind::Import,
             _ => unreachable!(),
         };
-        Some(Header { name, kind })
+        Ok(Header { name, kind })
     }
 }
 
@@ -181,22 +191,27 @@ pub enum Statement {
 }
 
 impl FromCst for Statement {
-    fn from_cst(cst: &Cst) -> Option<Self> {
+    fn from_cst(cst: &Cst) -> Result<Self> {
         let stmt = match cst.rule {
             Rule::let_stmt => {
                 let mut inner = cst.inner.iter().peekable();
-                let pat = inner.next()?.clone();
-                let type_annot = if inner.peek()?.rule == Rule::type_expr {
-                    Some(inner.next()?.clone())
+                let pat = inner.next().ok_or(anyhow!("expected pattern"))?.clone();
+                let type_annot = if inner
+                    .peek()
+                    .ok_or(anyhow!("expected type_expr or arg"))?
+                    .rule
+                    == Rule::type_expr
+                {
+                    Some(inner.next().unwrap().clone())
                 } else {
                     None
                 };
                 let mut args = vec![];
-                while inner.peek()?.rule == Rule::arg {
-                    let arg = inner.next()?.clone();
+                while inner.peek().ok_or(anyhow!("expected expr"))?.rule == Rule::arg {
+                    let arg = inner.next().unwrap().clone();
                     args.push(arg);
                 }
-                let expr = inner.next()?.clone();
+                let expr = inner.next().unwrap().clone();
                 Statement::Let {
                     pat,
                     type_annot,
@@ -206,7 +221,7 @@ impl FromCst for Statement {
             }
 
             Rule::let_rec_stmt => {
-                let let_rec_inner: Option<Vec<_>> = cst
+                let let_rec_inner: Result<Vec<_>> = cst
                     .inner
                     .iter()
                     .map(|rec_inner| LetRecInner::from_cst(rec_inner))
@@ -216,14 +231,17 @@ impl FromCst for Statement {
 
             Rule::let_inline_stmt_ctx => {
                 let mut inner = cst.inner.iter().peekable();
-                let var_context = Some(inner.next()?.clone());
-                let cmd = inner.next()?.clone();
+                let var_context = Some(inner.next().ok_or(anyhow!("expected context"))?.clone());
+                let cmd = inner
+                    .next()
+                    .ok_or(anyhow!("expected command name"))?
+                    .clone();
                 let mut args = vec![];
-                while inner.peek()?.rule == Rule::pattern {
-                    let arg = inner.next()?.clone();
+                while inner.peek().ok_or(anyhow!("expected expr"))?.rule == Rule::pattern {
+                    let arg = inner.next().unwrap().clone();
                     args.push(arg);
                 }
-                let expr = inner.next()?.clone();
+                let expr = inner.next().unwrap().clone();
                 Statement::LetInline {
                     var_context,
                     cmd,
@@ -234,13 +252,16 @@ impl FromCst for Statement {
             Rule::let_inline_stmt_noctx => {
                 let mut inner = cst.inner.iter().peekable();
                 let var_context = None;
-                let cmd = inner.next()?.clone();
+                let cmd = inner
+                    .next()
+                    .ok_or(anyhow!("expected command name"))?
+                    .clone();
                 let mut args = vec![];
-                while inner.peek()?.rule == Rule::arg {
-                    let arg = inner.next()?.clone();
+                while inner.peek().ok_or(anyhow!("expected expr"))?.rule == Rule::arg {
+                    let arg = inner.next().unwrap().clone();
                     args.push(arg);
                 }
-                let expr = inner.next()?.clone();
+                let expr = inner.next().unwrap().clone();
                 Statement::LetInline {
                     var_context,
                     cmd,
@@ -251,14 +272,17 @@ impl FromCst for Statement {
 
             Rule::let_block_stmt_ctx => {
                 let mut inner = cst.inner.iter().peekable();
-                let var_context = Some(inner.next()?.clone());
-                let cmd = inner.next()?.clone();
+                let var_context = Some(inner.next().ok_or(anyhow!("expected context"))?.clone());
+                let cmd = inner
+                    .next()
+                    .ok_or(anyhow!("expected command name"))?
+                    .clone();
                 let mut args = vec![];
-                while inner.peek()?.rule == Rule::pattern {
-                    let arg = inner.next()?.clone();
+                while inner.peek().ok_or(anyhow!("expected expr"))?.rule == Rule::pattern {
+                    let arg = inner.next().unwrap().clone();
                     args.push(arg);
                 }
-                let expr = inner.next()?.clone();
+                let expr = inner.next().unwrap().clone();
                 Statement::LetBlock {
                     var_context,
                     cmd,
@@ -269,13 +293,16 @@ impl FromCst for Statement {
             Rule::let_block_stmt_noctx => {
                 let mut inner = cst.inner.iter().peekable();
                 let var_context = None;
-                let cmd = inner.next()?.clone();
+                let cmd = inner
+                    .next()
+                    .ok_or(anyhow!("expected command name"))?
+                    .clone();
                 let mut args = vec![];
-                while inner.peek()?.rule == Rule::arg {
-                    let arg = inner.next()?.clone();
+                while inner.peek().ok_or(anyhow!("expected expr"))?.rule == Rule::arg {
+                    let arg = inner.next().unwrap().clone();
                     args.push(arg);
                 }
-                let expr = inner.next()?.clone();
+                let expr = inner.next().unwrap().clone();
                 Statement::LetBlock {
                     var_context,
                     cmd,
@@ -286,24 +313,31 @@ impl FromCst for Statement {
 
             Rule::let_math_stmt => {
                 let mut inner = cst.inner.iter().peekable();
-                let cmd = inner.next()?.clone();
+                let cmd = inner
+                    .next()
+                    .ok_or(anyhow!("expected command name"))?
+                    .clone();
                 let mut args = vec![];
-                while inner.peek()?.rule == Rule::arg {
-                    let arg = inner.next()?.clone();
+                while inner.peek().ok_or(anyhow!("expected expr"))?.rule == Rule::arg {
+                    let arg = inner.next().unwrap().clone();
                     args.push(arg);
                 }
-                let expr = inner.next()?.clone();
+                let expr = inner.next().unwrap().clone();
                 Statement::LetMath { cmd, args, expr }
             }
 
             Rule::let_mutable_stmt => {
-                let var = cst.inner.get(0)?.clone();
-                let expr = cst.inner.get(1)?.clone();
+                let var = cst
+                    .inner
+                    .get(0)
+                    .ok_or(anyhow!("expected var name"))?
+                    .clone();
+                let expr = cst.inner.get(1).ok_or(anyhow!("expected expr"))?.clone();
                 Statement::LetMutable { var, expr }
             }
 
             Rule::type_stmt => {
-                let type_inners: Option<Vec<_>> = cst
+                let type_inners: Result<Vec<_>> = cst
                     .inner
                     .iter()
                     .map(|type_inner| TypeInner::from_cst(type_inner))
@@ -312,16 +346,16 @@ impl FromCst for Statement {
             }
 
             Rule::module_stmt => {
-                let name = cst.inner.get(0)?.clone();
-                let sig_stmt = cst.inner.get(1)?;
-                let struct_stmt = cst.inner.get(2)?;
-                let signature: Option<Vec<_>> = sig_stmt
+                let name = cst.inner.get(0).ok_or(anyhow!("expected name"))?.clone();
+                let sig_stmt = cst.inner.get(1).ok_or(anyhow!("expected sig_stmt"))?;
+                let struct_stmt = cst.inner.get(2).ok_or(anyhow!("expected struct_stmt"))?;
+                let signature: Result<Vec<_>> = sig_stmt
                     .inner
                     .iter()
                     .map(|sig_inner| Signature::from_cst(sig_inner))
                     .collect();
                 let signature = signature?;
-                let statements: Option<Vec<_>> = struct_stmt
+                let statements: Result<Vec<_>> = struct_stmt
                     .inner
                     .iter()
                     .map(|stmt| Statement::from_cst(stmt))
@@ -334,12 +368,17 @@ impl FromCst for Statement {
                 }
             }
 
-            Rule::open_stmt => Statement::Open(cst.inner.get(0)?.clone()),
+            Rule::open_stmt => Statement::Open(
+                cst.inner
+                    .get(0)
+                    .ok_or(anyhow!("expected module name"))?
+                    .clone(),
+            ),
 
-            Rule::dummy_stmt => return None,
+            Rule::dummy_stmt => return Err(anyhow!("dummy statement")),
             _ => unreachable!(),
         };
-        Some(stmt)
+        Ok(stmt)
     }
 }
 
@@ -363,18 +402,18 @@ pub enum Signature {
 }
 
 impl FromCst for Signature {
-    fn from_cst(cst: &Cst) -> Option<Self> {
+    fn from_cst(cst: &Cst) -> Result<Self> {
         match cst.rule {
             Rule::sig_type_stmt => {
                 let mut inner = cst.inner.iter().peekable();
                 let mut param = vec![];
-                while inner.peek()?.rule == Rule::type_param {
-                    let p = inner.next()?.clone();
+                while inner.peek().ok_or(anyhow!("expect type name"))?.rule == Rule::type_param {
+                    let p = inner.next().unwrap().clone();
                     param.push(p);
                 }
-                let name = inner.next()?.clone();
+                let name = inner.next().unwrap().clone();
                 let constraint = inner.map(|cst| cst.clone()).collect();
-                Some(Signature::Type {
+                Ok(Signature::Type {
                     param,
                     name,
                     constraint,
@@ -383,10 +422,10 @@ impl FromCst for Signature {
 
             Rule::sig_val_stmt => {
                 let mut inner = cst.inner.iter();
-                let var = inner.next()?.clone();
-                let signature = inner.next()?.clone();
+                let var = inner.next().ok_or(anyhow!("expect var"))?.clone();
+                let signature = inner.next().ok_or(anyhow!("expect signature"))?.clone();
                 let constraint = inner.map(|cst| cst.clone()).collect();
-                Some(Signature::Val {
+                Ok(Signature::Val {
                     var,
                     signature,
                     constraint,
@@ -395,17 +434,17 @@ impl FromCst for Signature {
 
             Rule::sig_direct_stmt => {
                 let mut inner = cst.inner.iter();
-                let var = inner.next()?.clone();
-                let signature = inner.next()?.clone();
+                let var = inner.next().ok_or(anyhow!("expect var"))?.clone();
+                let signature = inner.next().ok_or(anyhow!("expect signature"))?.clone();
                 let constraint = inner.cloned().collect();
-                Some(Signature::Direct {
+                Ok(Signature::Direct {
                     var,
                     signature,
                     constraint,
                 })
             }
 
-            Rule::dummy_sig_stmt => None,
+            Rule::dummy_sig_stmt => Err(anyhow!("dummy signature statement")),
             _ => unreachable!(),
         }
     }
@@ -425,24 +464,29 @@ pub struct LetRecVariant {
 }
 
 impl FromCst for LetRecInner {
-    fn from_cst(cst: &Cst) -> Option<Self> {
+    fn from_cst(cst: &Cst) -> Result<Self> {
         let mut inner = cst.inner.iter().peekable();
-        let pattern = inner.next()?.clone();
-        let type_expr = if inner.peek().unwrap().rule == Rule::type_expr {
-            Some(inner.next()?.clone())
+        let pattern = inner.next().ok_or(anyhow!("expected pattern"))?.clone();
+        let type_expr = if inner
+            .peek()
+            .ok_or(anyhow!("expected variant or expr"))?
+            .rule
+            == Rule::type_expr
+        {
+            Some(inner.next().unwrap().clone())
         } else {
             None
         };
         let mut variant = vec![];
         while inner.peek().is_some() {
             let mut args = vec![];
-            while inner.peek().unwrap().rule == Rule::arg {
-                args.push(inner.next()?.clone())
+            while inner.peek().ok_or(anyhow!("expected expr"))?.rule == Rule::arg {
+                args.push(inner.next().unwrap().clone())
             }
-            let expr = inner.next()?.clone();
+            let expr = inner.next().unwrap().clone();
             variant.push(LetRecVariant { args, expr });
         }
-        Some(LetRecInner {
+        Ok(LetRecInner {
             pattern,
             type_expr,
             variant,
@@ -459,27 +503,32 @@ pub struct TypeInner {
 }
 
 impl FromCst for TypeInner {
-    fn from_cst(cst: &Cst) -> Option<Self> {
+    fn from_cst(cst: &Cst) -> Result<Self> {
         let mut inner = cst.inner.iter().peekable();
         let mut param = vec![];
-        while inner.peek().unwrap().rule == Rule::type_param {
-            let p = inner.next()?.clone();
+        while inner.peek().ok_or(anyhow!("expected type name"))?.rule == Rule::type_param {
+            let p = inner.next().unwrap().clone();
             param.push(p);
         }
-        let name = inner.next()?.clone();
+        let name = inner.next().unwrap().clone();
 
-        let body = if inner.peek().unwrap().rule == Rule::type_expr {
-            TypeBody::Expr(inner.next()?.clone())
+        let body = if inner
+            .peek()
+            .ok_or(anyhow!("expected type expr or type variant"))?
+            .rule
+            == Rule::type_expr
+        {
+            TypeBody::Expr(inner.next().unwrap().clone())
         } else {
             let mut variants = vec![];
-            while inner.peek()?.rule == Rule::type_variant {
-                let v = inner.next()?.clone();
+            while inner.peek().is_some() && inner.peek().unwrap().rule == Rule::type_variant {
+                let v = inner.next().unwrap().clone();
                 variants.push(v);
             }
             TypeBody::Variants(variants)
         };
         let constraint = inner.cloned().collect();
-        Some(TypeInner {
+        Ok(TypeInner {
             param,
             name,
             constraint,
