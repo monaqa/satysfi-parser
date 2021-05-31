@@ -1,6 +1,6 @@
 use std::fmt::Display;
 
-use itertools::assert_equal;
+use itertools::{assert_equal, Itertools};
 
 use crate::{grammar, Mode};
 
@@ -62,7 +62,7 @@ impl<T> Vectorize<T> for Option<Vec<T>> {
 }
 
 /// コードの範囲を表すもの。 usize 2 個ぶんなので Copyable.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct Span {
     pub start: usize,
     pub end: usize,
@@ -81,7 +81,7 @@ impl Span {
 }
 
 /// コードを line & column 形式 (0-indexed) で指定したもの。
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct LineCol {
     pub line: usize,
     pub column: usize,
@@ -89,7 +89,7 @@ pub struct LineCol {
 
 /// CST にテキストの情報を付加したもの。
 // TODO: 自己参照構造体にする。
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq, Hash)]
 pub struct CstText {
     pub text: String,
     pub lines: Vec<usize>,
@@ -235,11 +235,12 @@ impl CstText {
         let span = span.unwrap();
 
         // TODO: まあまあアドホックなのでなんとかしたい
-        let text = self.get_text_from_span(Span {
-            start: span.start,
-            end: pos,
-        });
-        for c in text.chars().rev() {
+        let text = self.get_text_from_span(span);
+        let char_indices = text.char_indices().map(|(idx, _)| idx).collect_vec();
+        let pos_char = char_indices
+            .binary_search(&(pos - span.start))
+            .unwrap_or_else(|x| x);
+        for c in text.chars().take(pos_char).collect_vec().into_iter().rev() {
             match c {
                 // 改行が見つかったらそこで探索打ち切り。コメントでないこと確定
                 '\n' => return false,
@@ -274,7 +275,7 @@ impl Display for CstText {
 
 /// Concrete syntax tree.
 /// 1つの CST は構文規則、テキストの範囲、子要素からなり、全体として木構造をなす。
-#[derive(Debug, PartialEq, Eq, Clone)]
+#[derive(Debug, PartialEq, Eq, Clone, Hash)]
 pub struct Cst {
     /// 構文規則。
     pub rule: Rule,
