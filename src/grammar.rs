@@ -201,17 +201,17 @@ peg::parser! {
 
         pub rule type_inner() -> Cst =
             s:p()
-            tp:type_param()* _ t:type_name() _ "=" tvs:(_ "|" _ tv:type_variant() {tv})+ _ c:constraint()*
+            tp:(type_param() ** _) _ t:type_name() _ "=" tvs:(_ "|" _ tv:type_variant() {tv})+ _ c:constraint()*
             e:p()
             { cst!(type_inner (s, e) [tp, t, tvs, c]) }
             /
             s:p()
-            tp:type_param()* _ t:type_name() _ "=" _ tvs:(type_variant() ++  (_ "|" _)) _ c:constraint()*
+            tp:(type_param() ** _) _ t:type_name() _ "=" _ tvs:(type_variant() ++  (_ "|" _)) _ c:constraint()*
             e:p()
             { cst!(type_inner (s, e) [tp, t, tvs, c]) }
             /
             s:p()
-            tp:type_param()* _ t:type_name() _ "=" _ te:type_expr() _ c:constraint()*
+            tp:(type_param() ** _) _ t:type_name() _ "=" _ te:type_expr() _ c:constraint()*
             e:p()
             { cst!(type_inner (s, e) [tp, t, te, c]) }
 
