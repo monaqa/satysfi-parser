@@ -411,7 +411,7 @@ peg::parser! {
         { cst!(match_expr (s, e) [expr, arms]) }
 
         pub rule bind_stmt() -> Cst =
-            s:p() stmt:(let_stmt() / let_rec_stmt() / let_math_stmt() / let_mutable_stmt())
+            s:p() stmt:(let_stmt() / let_rec_stmt() / let_math_stmt() / let_mutable_stmt() / open_stmt())
             _ kwd("in") _ expr:expr() e:p()
         { cst!(bind_stmt (s, e) [stmt, expr]) }
 
