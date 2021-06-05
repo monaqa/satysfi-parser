@@ -791,7 +791,7 @@ peg::parser! {
 
         pub rule dummy_block_cmd_incomplete() -> Cst =
             s:p()
-            "\\" (var_ptn() / modvar())?
+            "+" (var_ptn() / modvar())?
             e:p()
         { cst!(dummy_block_cmd_incomplete (s, e) []) }
 
