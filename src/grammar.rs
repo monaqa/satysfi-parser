@@ -466,7 +466,7 @@ peg::parser! {
 
         pub rule application() -> Cst =
             s:p()
-            v:(var() / modvar()) _
+            v:(unary()) _
             args:(application_args() ++ _)
             e:p()
         { cst!(application (s, e) [v, args]) }
