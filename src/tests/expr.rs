@@ -57,19 +57,32 @@ fn application_args_optional() {
 #[test]
 fn application() {
     assert_parsed!("foo bar" application: [
-        "foo" var: [];
+        "foo" unary, var: [];
         "bar" application_args_normal: [_];
     ]);
     assert_parsed!("foo ?:bar baz" application: [
-        "foo" var: [];
+        "foo" unary, var: [];
         "?:bar" application_args_optional: [_];
         "baz" application_args_normal: [_];
     ]);
     assert_parsed!("Mod.foo bar" application: [
-        "Mod.foo" modvar: [_];
+        "Mod.foo" unary, modvar: [_];
         "bar" application_args_normal: [_];
     ]);
     assert_parsed!("stroke lwid clr (Gr.line pt1 pt2)" application: [_]);
+    assert_parsed!("(x y) z" application: [
+        "(x y)" unary: [
+        "x y" expr, application: [_];
+        ];
+        "z" application_args_normal: [_];
+    ]);
+    assert_parsed!("foo#bar baz" application: [
+        "foo#bar" unary: [
+            "foo" var: [];
+            "bar" var: [];
+        ];
+        "baz" application_args_normal: [_];
+    ]);
 }
 
 #[test]
