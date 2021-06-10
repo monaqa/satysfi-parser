@@ -1,6 +1,6 @@
 [package]
 name = "satysfi-parser"
-version = "0.1.0"
+version = "0.0.1"
 authors = ["monaqa <mogassy@yahoo.co.jp>"]
 edition = "2018"
 

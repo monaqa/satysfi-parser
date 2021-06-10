@@ -2,7 +2,6 @@ use std::path::PathBuf;
 
 use anyhow::Result;
 
-use peg::str::LineCol;
 use satysfi_parser::grammar;
 use satysfi_parser::CstText;
 

@@ -1,8 +1,8 @@
 use std::fmt::Display;
 
-use itertools::{assert_equal, Itertools};
+use itertools::Itertools;
 
-use crate::{grammar, Mode};
+use crate::Mode;
 
 use self::rule::Rule;
 

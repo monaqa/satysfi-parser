@@ -1,6 +1,6 @@
 //! saty ファイル、satyh ファイルの大まかな構造を格納したデータ構造。
 
-use crate::{Cst, CstText, LineCol, Rule, Span};
+use crate::{Cst, LineCol, Rule, Span};
 use anyhow::{anyhow, Result};
 use itertools::Itertools;
 
