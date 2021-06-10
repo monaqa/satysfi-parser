@@ -256,6 +256,8 @@ impl CstText {
 
 #[test]
 fn test_is_comment() {
+    use crate::grammar;
+
     let csttext = CstText::parse("let x = 1 in% foo \n  2", grammar::program).unwrap();
     assert_eq!(csttext.is_comment(11), false); // let x = 1 i"n" foo
     assert_eq!(csttext.is_comment(12), false); // let x = 1 in"%" foo

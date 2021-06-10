@@ -1,7 +1,6 @@
 //! ~/.satysfi/dist/packages 下にあるすべての satyh ファイルをパースする。
 
 use glob::glob;
-use std::path::PathBuf;
 
 use anyhow::{Context, Result};
 use satysfi_parser::CstText;
@@ -15,7 +14,7 @@ fn main() -> Result<()> {
                 let text = std::fs::read_to_string(&file)?;
                 let csttext = CstText::parse(&text, satysfi_parser::grammar::program_satyh);
                 match csttext {
-                    Ok(csttext) => {
+                    Ok(_) => {
                         println!("Parsing of {file:?} was successful!", file = file);
                         println!();
                     }
