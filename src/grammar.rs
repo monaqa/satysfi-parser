@@ -518,11 +518,11 @@ peg::parser! {
         pub rule unary_prefix() -> Cst = s:p() ("!" / "&" / "~") e:p() { cst!(unary_prefix (s, e) []) }
 
         pub rule block_text() -> Cst =
-            s:p() "'<" _ v:vertical() _ ">" e:p()
+            s:p() "'" v:vertical() e:p()
         { cst!(block_text (s, e) [v]) }
 
         pub rule horizontal_text() -> Cst =
-            s:p() "{" _ h:horizontal() _ "}" e:p()
+            s:p() h:horizontal() e:p()
         { cst!(horizontal_text (s, e) [h]) }
 
         pub rule math_text() -> Cst =
@@ -692,8 +692,7 @@ peg::parser! {
 
         pub rule cmd_text_arg() -> Cst =
             s:p()
-            inner:("<" _ inner:vertical() _ ">" {inner}
-                / "{" inner:horizontal() "}" {inner})  // horizontal の前後空白は regular_text で食う
+            inner:(vertical() / horizontal())
             e:p()
         { cst!(cmd_text_arg (s, e) [inner]) }
 
@@ -713,8 +712,8 @@ peg::parser! {
 
         rule math_cmd_expr_arg_inner() -> Cst =
             "{" _ m:math() _ "}" {m}
-            / "!{" _ h:horizontal() _ "}" {h}
-            / "!<" _ v:vertical() _ ">" {v}
+            / "!" h:horizontal() {h}
+            / "!" v:vertical() {v}
             / "!(" _ expr:expr() _ ")" {expr}
             / "!" l:list() {l}
             / "!" r:record() {r}
@@ -729,9 +728,15 @@ peg::parser! {
 
         // §1. horizontal mode
         rule horizontal() -> Cst =
+            // horizontal の前後空白は regular_text で食う
+            "{"
+            h:(
             horizontal_list()
             / horizontal_bullet_list()
             / horizontal_single()
+            )
+            "}"
+            {h}
 
         pub rule horizontal_single() -> Cst =
             s:p() __ inners:(horizontal_token() ** __) __ e:p() { cst!(horizontal_single (s, e) [inners]) }
@@ -787,7 +792,7 @@ peg::parser! {
         // §1. vertical mode
 
         pub rule vertical() -> Cst =
-            s:p() vs:(vertical_element() ** _) e:p()
+            s:p() "<" _ vs:(vertical_element() ** _) _ ">" e:p()
         { cst!(vertical (s, e) [vs]) }
 
         rule vertical_element() -> Cst = block_cmd() / block_text_embedding() / dummy_block_cmd_incomplete()

@@ -176,10 +176,12 @@ fn horizontal_text() {
         "|abc|" horizontal_list: ["abc" horizontal_single: [_]; ];
     ]);
     assert_parsed!("{ | abc | }" horizontal_text: [
-        "| abc | " horizontal_list: [" abc " horizontal_single: [_]; ];
+        " | abc | " horizontal_list: [
+        " abc " horizontal_single: [_];
+        ];
     ]);
     assert_parsed!("{ | abc | | }" horizontal_text: [
-        "| abc | | " horizontal_list: [
+        " | abc | | " horizontal_list: [
             " abc " horizontal_single: [_];
             " " horizontal_single: [_];
         ];
@@ -188,12 +190,14 @@ fn horizontal_text() {
 
 #[test]
 fn block_text() {
-    assert_parsed!("'<>" block_text: ["" vertical: [];]);
+    assert_parsed!("'<>" block_text: ["<>" vertical: [];]);
     assert_parsed!("'< +p{aaa} >" block_text: [
-        "+p{aaa}" vertical, block_cmd: [_];
+        "< +p{aaa} >" vertical: [
+            "+p{aaa}" block_cmd: [_];
+        ];
     ]);
     assert_parsed!("'< +toc; #sec1; +p{aaa} >" block_text: [
-        "+toc; #sec1; +p{aaa}" vertical: [
+        "< +toc; #sec1; +p{aaa} >" vertical: [
             "+toc;" block_cmd: [_];
             "#sec1;" block_text_embedding: [_];
             "+p{aaa}" block_cmd: [_];

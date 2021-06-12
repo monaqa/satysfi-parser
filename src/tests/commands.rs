@@ -4,7 +4,7 @@ use super::*;
 fn math_cmd_expr_arg() {
     assert_parsed!("{}" math_cmd_expr_arg: ["" math_single: [];]);
     assert_parsed!("!{}" math_cmd_expr_arg: ["" horizontal_single: [];]);
-    assert_parsed!("!<>" math_cmd_expr_arg: ["" vertical: [];]);
+    assert_parsed!("!<>" math_cmd_expr_arg: ["<>" vertical: [];]);
     // TODO: inner を埋める
     assert_parsed!("!(())" math_cmd_expr_arg: [_]);
     assert_parsed!("![]" math_cmd_expr_arg: [_]);
@@ -15,7 +15,7 @@ fn math_cmd_expr_arg() {
 fn math_cmd_expr_option() {
     assert_parsed!("?:{}" math_cmd_expr_option: ["" math_single: [];]);
     assert_parsed!("?:!{}" math_cmd_expr_option: ["" horizontal_single: [];]);
-    assert_parsed!("?:!<>" math_cmd_expr_option: ["" vertical: [];]);
+    assert_parsed!("?:!<>" math_cmd_expr_option: ["<>" vertical: [];]);
     // TODO: inner を埋める
     assert_parsed!("?:!(())" math_cmd_expr_option: [_]);
     assert_parsed!("?:![]" math_cmd_expr_option: [_]);
@@ -66,7 +66,7 @@ fn cmd_expr_option() {
 #[test]
 fn cmd_text_arg() {
     assert_parsed!("{hoge}" cmd_text_arg: ["hoge" horizontal_single, regular_text: [];]);
-    assert_parsed!("<>" cmd_text_arg: ["" vertical: [];]);
+    assert_parsed!("<>" cmd_text_arg, vertical: []);
 }
 
 #[test]
@@ -85,8 +85,8 @@ fn block_cmd() {
     assert_parsed!("+section{#secname;}<+p{ abc }>" block_cmd: [
         "+section" block_cmd_name: [_];
         "{#secname;}" cmd_text_arg: [_];
-        "<+p{ abc }>" cmd_text_arg: [
-            "+p{ abc }" vertical, block_cmd: [
+        "<+p{ abc }>" cmd_text_arg, vertical: [
+            "+p{ abc }" block_cmd: [
                 "+p" block_cmd_name: [_];
                 "{ abc }" cmd_text_arg: [" abc " horizontal_single, regular_text: []; ];
             ];
