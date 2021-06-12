@@ -260,7 +260,11 @@ impl Rule {
             | Rule::expr_with_mod
             | Rule::mod_cmd_name
             | Rule::module_name
-            | Rule::variant_name => Mode::Program,
+            | Rule::variant_name
+            | Rule::cmd_expr_arg
+            | Rule::cmd_expr_option
+            | Rule::math_cmd_expr_arg
+            | Rule::math_cmd_expr_option => Mode::Program,
 
             Rule::sig_stmt
             | Rule::dummy_sig_stmt
