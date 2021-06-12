@@ -510,6 +510,7 @@ peg::parser! {
                 / expr_with_mod()
                 / modvar()
                 / var()
+                / dummy_modvar_incomplete()
             ) ++ (_ "#" _))
             e:p()
         { cst!(unary (s, e) [prefix, body]) }
@@ -569,6 +570,10 @@ peg::parser! {
         pub rule var_ptn() -> Cst =
             s:p() ['a'..='z'] ASCII_ALPHANUMERIC_HYPHEN()* e:p()
         { cst!(var_ptn (s, e) []) }
+
+        pub rule dummy_modvar_incomplete() -> Cst =
+            s:p() module_name() "." e:p()
+            { cst!(dummy_modvar_incomplete (s, e) []) }
 
         // 予約語たち
         rule reserved_word() =
@@ -750,7 +755,7 @@ peg::parser! {
 
         pub rule dummy_inline_cmd_incomplete() -> Cst =
             s:p()
-            "\\" (var_ptn() / modvar())?
+            "\\" (var_ptn() / modvar() / dummy_modvar_incomplete())?
             e:p()
         { cst!(dummy_inline_cmd_incomplete (s, e) []) }
 
@@ -793,7 +798,7 @@ peg::parser! {
 
         pub rule dummy_block_cmd_incomplete() -> Cst =
             s:p()
-            "+" (var_ptn() / modvar())?
+            "+" (var_ptn() / modvar() / dummy_modvar_incomplete())?
             e:p()
         { cst!(dummy_block_cmd_incomplete (s, e) []) }
 

@@ -175,6 +175,7 @@ make_rule! {
     dummy_stmt,
     dummy_inline_cmd_incomplete,
     dummy_block_cmd_incomplete,
+    dummy_modvar_incomplete,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
