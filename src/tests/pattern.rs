@@ -37,6 +37,7 @@ fn pattern() {
     assert_parsed!("[x; y]" pattern, pat_list: [_]);
     assert_parsed!("(x)" pattern: ["x" pat_as: [_]; ]);
     assert_parsed!("(x, y)" pattern, pat_tuple: [_]);
+    assert_parsed!("(+)" pattern: ["+" bin_operator: []; ]);
 }
 
 #[test]

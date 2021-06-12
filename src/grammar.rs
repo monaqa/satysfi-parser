@@ -370,6 +370,8 @@ peg::parser! {
         #[cache]
         pub rule pattern() -> Cst =
             s:p() p:pat_list() e:p() { cst!(pattern (s, e) [p]) }
+            / s:p() "(" _ b:bin_operator() _ ")" e:p() { cst!(pattern (s, e) [b]) }
+            / s:p() "(" _ u:unary_operator() _ ")" e:p() { cst!(pattern (s, e) [u]) }
             / s:p() "(" _ p:pat_as() _ ")" e:p() { cst!(pattern (s, e) [p]) }
             / s:p() p:pat_tuple() e:p() { cst!(pattern (s, e) [p]) }
             / s:p() "_" e:p() { cst!(pattern (s, e) []) }
