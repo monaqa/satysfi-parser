@@ -20,7 +20,7 @@ anyhow = "1.0.38"
 glob = "0.3.0"
 itertools = "0.10.0"
 log = "0.4.14"
-peg = "0.6.3"
+peg = "0.7.0"
 structopt = "0.3.21"
 thiserror = "1.0.24"
 
