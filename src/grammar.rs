@@ -680,7 +680,6 @@ peg::parser! {
 
         pub rule cmd_expr_arg() -> Cst =
             s:p() inner:cmd_expr_arg_inner() e:p() { cst!(cmd_expr_arg (s, e) [inner]) }
-            / s:p() "?*" e:p() { cst!(cmd_expr_arg (s, e) []) }
 
         pub rule cmd_expr_option() -> Cst =
             s:p() "?:" _ inner:cmd_expr_arg_inner() e:p() { cst!(cmd_expr_option (s, e) [inner]) }
