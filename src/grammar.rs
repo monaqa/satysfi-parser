@@ -1,3 +1,5 @@
+#![allow(non_snake_case)]
+
 use crate::cst;
 use crate::types::rule::Rule;
 use crate::types::Span;
