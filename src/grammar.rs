@@ -377,7 +377,7 @@ peg::parser! {
             / s:p() "(" _ p:pat_as() _ ")" e:p() { cst!(pattern (s, e) [p]) }
             / s:p() p:pat_tuple() e:p() { cst!(pattern (s, e) [p]) }
             / s:p() "_" e:p() { cst!(pattern (s, e) []) }
-            / s:p() v:var() e:p() { cst!(pattern (s, e) [v]) }
+            / s:p() "~"? v:var() e:p() { cst!(pattern (s, e) [v]) }
             / s:p() l:constant() e:p() { cst!(pattern (s, e) [l]) }
 
         pub rule pat_variant() -> Cst =
