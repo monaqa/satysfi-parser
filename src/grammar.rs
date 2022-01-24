@@ -638,7 +638,7 @@ peg::parser! {
         rule length_unit() = ['a'..='z'] ['0'..='9' | 'a'..='z' | 'A' ..='Z' | '-']*
 
         pub rule const_string() -> Cst =
-            s:p() "#"? qs:string_quotes() (!string_inner(qs) [_])+ qe:string_quotes() "#"? e:p()
+            s:p() "@"? "#"? qs:string_quotes() (!string_inner(qs) [_])+ qe:string_quotes() "#"? e:p()
             {?
                 if qs == qe {
                     Ok(cst!(const_string (s, e) []))
@@ -659,7 +659,7 @@ peg::parser! {
         )
 
         pub rule inline_cmd_name() -> Cst =
-            s:p() r"\" inner:(mod_cmd_name() / cmd_name_ptn()) e:p()
+            s:p() r"\" inner:(mod_cmd_name() / cmd_name_ptn()) "@"? e:p()
         { cst!(inline_cmd_name (s, e) [inner]) }
 
         pub rule cmd_name_ptn() -> Cst =
@@ -675,7 +675,7 @@ peg::parser! {
         )
 
         pub rule block_cmd_name() -> Cst =
-            s:p() "+" inner:(mod_cmd_name() / cmd_name_ptn()) e:p()
+            s:p() "+" inner:(mod_cmd_name() / cmd_name_ptn()) "@"? e:p()
         { cst!(block_cmd_name (s, e) [inner]) }
 
         pub rule cmd_expr_arg() -> Cst =
@@ -690,7 +690,7 @@ peg::parser! {
             const_unit()
             / list()
             / record()
-            / "(" _ expr:expr() _ ")" { expr }
+            / "~"? "(" _ expr:expr() _ ")" { expr }
 
         pub rule cmd_text_arg() -> Cst =
             s:p()
