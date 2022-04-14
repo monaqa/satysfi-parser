@@ -1,5 +1,13 @@
 # History
 
+## Unreleased
+
+## v0.0.3 (2022/04/14)
+
+- support unicode math ([\#9](https://github.com/monaqa/satysfi-parser/pull/9) by @TonalidadeHidrica)
+- support macro grammar
+- support horizontal escapable characters
+
 ## v0.0.2 (2021/06/12)
 
 - modify `hozirontal`/`vertical` rule (now these include parens)
